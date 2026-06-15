@@ -2859,7 +2859,6 @@ function getAuthInputs(){
 }
 function validateAuthInputs(mode){
   const { email, pass, emailEl, passEl } = getAuthInputs();
-  console.log('[AUTH DEBUG]', mode, { emailLength: email.length, passLength: pass.length });
   if(!email){
     showAuthError('Saisis ton email dans le champ EMAIL. Le texte gris est seulement un exemple.');
     emailEl?.focus();
@@ -3269,14 +3268,11 @@ window.SCI_DEBUG = async function(){
     currentSCI: APP_STATE.currentSCI,
     cacheCounts:Object.fromEntries(Object.keys(CACHE).map(k=>[k, CACHE[k].length]))
   };
-  console.log('[SCI DEBUG]', info);
   try{
     const snap = await db.collection('scis').doc(SCI_ID).collection('biens').get({source:'server'});
-    console.log('[SCI DEBUG] biens serveur', SCI_ID, snap.size, snap.docs.map(d=>({docId:d.id, ...d.data()})));
   }catch(e){ console.error('[SCI DEBUG] lecture serveur impossible', e); }
   return info;
 };
-console.log('[SCI Family] V1.2.4 GFA design icônes chargé', {projectId: firebase.app().options.projectId, SCI_ID});
 
 // Boutons auth : gestion uniquement par onclick direct dans le HTML.
 </script>
@@ -6290,7 +6286,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     else { closeModalSafe('m-pv-ag'); }
   };
 })();
-</script>\n
+</script>
 <script id="patch-pouvoir-minimal-v112">
 (function(){
   function $(id){ return document.getElementById(id); }
