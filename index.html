@@ -860,35 +860,46 @@
         <p style="font-size:12px;color:var(--text2);line-height:1.5;margin-top:10px">Estimation basée sur la taille des fichiers importés + surcoût base64/chunks. Les images sont compressées automatiquement avant stockage.</p>
       </div>
     </div>
-    <div class="card" style="cursor:default">
-      <div class="card-hd"><div><div class="card-title">📤 Export des données</div><div class="card-sub">Sauvegarde complète ou par module</div></div></div>
+    <div class="card settings-export-card" style="cursor:default">
+      <div class="card-hd"><div><div class="card-title">📤 Sauvegarde et exports</div><div class="card-sub">Données complètes, fichiers et exports par module</div></div></div>
       <div class="divider"></div>
-      <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">Exporte les données de la structure active : comptabilité, biens, locataires, documents, associés, échéances, messages, décisions, AG, PV, pouvoirs et baux GFA.</p>
-      <div style="display:grid;gap:10px;margin-bottom:14px">
-        <button class="btn" type="button" onclick="exportSCIDataJSON()">💾 Export global JSON</button>
-        <button class="btn-out" type="button" onclick="exportSCIDataExcel()">📊 Export global Excel</button>
-        <button class="btn-out" type="button" onclick="exportAllDocumentsZip()">📦 Télécharger tous les documents en ZIP</button>
+      <div class="settings-export-intro">
+        <strong>Sauvegarde recommandée</strong>
+        <span>Exporte régulièrement la structure active : comptabilité, biens, locataires, documents, associés, échéances, messages, décisions, AG, PV, pouvoirs et baux GFA.</span>
+      </div>
+      <div class="settings-export-actions" aria-label="Exports principaux">
+        <button class="settings-export-action primary" type="button" onclick="exportSCIDataJSON()">
+          <span>💾</span><strong>Exporter toutes les données</strong><small>JSON complet pour sauvegarde ou restauration future.</small>
+        </button>
+        <button class="settings-export-action" type="button" onclick="exportSCIDataExcel()">
+          <span>📊</span><strong>Exporter en Excel</strong><small>Classeur lisible avec un onglet par module.</small>
+        </button>
+        <button class="settings-export-action" type="button" onclick="exportAllDocumentsZip()">
+          <span>📦</span><strong>Télécharger tous les documents</strong><small>ZIP avec manifeste et fichiers disponibles.</small>
+        </button>
       </div>
       <div class="divider"></div>
-      <div class="fg" style="margin-bottom:10px">
-        <label>Export CSV par module</label>
-        <select id="export-module-select">
-          <option value="comptabilite">Comptabilité</option>
-          <option value="biens">Biens</option>
-          <option value="locataires">Locataires</option>
-          <option value="documents">Documents</option>
-          <option value="associes">Associés</option>
-          <option value="echeances">Échéances</option>
-          <option value="messages">Messages</option>
-          <option value="decisions">Décisions / votes</option>
-          <option value="assembleesGenerales">Assemblées générales</option>
-          <option value="procesVerbaux">Procès-verbaux</option>
-          <option value="pouvoirs">Pouvoirs</option>
-          <option value="bauxGFA">Baux GFA</option>
-        </select>
+      <div class="settings-export-csv">
+        <div class="fg">
+          <label>Export CSV par module</label>
+          <select id="export-module-select">
+            <option value="comptabilite">Comptabilité</option>
+            <option value="biens">Biens</option>
+            <option value="locataires">Locataires</option>
+            <option value="documents">Documents</option>
+            <option value="associes">Associés</option>
+            <option value="echeances">Échéances</option>
+            <option value="messages">Messages</option>
+            <option value="decisions">Décisions / votes</option>
+            <option value="assembleesGenerales">Assemblées générales</option>
+            <option value="procesVerbaux">Procès-verbaux</option>
+            <option value="pouvoirs">Pouvoirs</option>
+            <option value="bauxGFA">Baux GFA</option>
+          </select>
+        </div>
+        <button class="btn-out" type="button" onclick="exportSCIDataCSV()">⬇️ Exporter ce module en CSV</button>
       </div>
-      <button class="btn-out" type="button" onclick="exportSCIDataCSV()">⬇️ Exporter ce module en CSV</button>
-      <p class="readonly-note">Étape 3 : JSON + Excel + CSV par module + téléchargement de tous les documents en ZIP, sans modifier les autres pages.</p>
+      <p class="readonly-note">JSON pour la sauvegarde complète, Excel pour la lecture, ZIP pour archiver les pièces jointes, CSV pour travailler un module précis.</p>
     </div>
     <div class="card write-only" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">🧹 Base de données</div><div class="card-sub">Données de démonstration</div></div></div>
