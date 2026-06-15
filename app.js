@@ -359,6 +359,11 @@ window.resetPassword = async function(){
   }
 };
 
+document.addEventListener('DOMContentLoaded', function(){
+  const resetButton = document.getElementById('btn-reset-password');
+  if(resetButton) resetButton.addEventListener('click', window.resetPassword);
+});
+
 window.doRegister = async function(){
   const data = validateAuthInputs('register');
   if(!data) return;
