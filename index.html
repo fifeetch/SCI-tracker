@@ -813,9 +813,10 @@
 <div id="page-parametres" class="page">
   <div class="back-btn" onclick="goPage('home')">← Retour</div>
   <div class="sec-hdr">
-    <div><h2>Paramètres</h2><p>Compte utilisateur et préférences</p></div>
+    <div><h2>Paramètres</h2><p>Compte, sauvegardes, accès et diagnostic Firebase</p></div>
   </div>
-  <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+  <div class="settings-grid">
+    <div class="settings-section-title">Compte et apparence</div>
     <div class="card" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">👤 Mon compte</div><div class="card-sub" id="account-email">—</div><div class="card-sub">Profil : <strong id="account-role">—</strong></div><div class="card-sub">SCI : <strong id="account-sci">—</strong></div></div></div>
       <div class="divider"></div>
@@ -846,10 +847,9 @@
       <div class="card-hd"><div><div class="card-title">🎨 Apparence</div><div class="card-sub">Mode clair / sombre</div></div></div>
       <div class="divider"></div>
       <button class="btn-out" type="button" onclick="toggleTheme()">Changer le thème</button>
-      <div class="divider"></div>
-      <button class="btn-del" type="button" onclick="emergencyLocalReset()">🧹 Réinitialiser cache local</button>
-      <p class="readonly-note">V1.1.2 : synchronisation multi-SCI contrôlée, lecture serveur et diagnostic du chemin Firebase actif.</p>
+      <p class="readonly-note">Le mode clair est utilisé par défaut. Le choix est mémorisé sur cet appareil.</p>
     </div>
+    <div class="settings-section-title">Sauvegarde et stockage</div>
     <div class="card" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">💾 Stockage documents</div><div class="card-sub">Estimation Firestore gratuit — limite 1 Go</div></div></div>
       <div class="divider"></div>
@@ -901,6 +901,7 @@
       </div>
       <p class="readonly-note">JSON pour la sauvegarde complète, Excel pour la lecture, ZIP pour archiver les pièces jointes, CSV pour travailler un module précis.</p>
     </div>
+    <div class="settings-section-title">Technique et accès</div>
     <div class="card write-only" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">🧹 Base de données</div><div class="card-sub">Données de démonstration</div></div></div>
       <div class="divider"></div>
@@ -912,6 +913,19 @@
       <div class="divider"></div>
       <p style="font-size:13px;color:var(--text2);line-height:1.6">Les gérants peuvent tout modifier. Les associés peuvent uniquement consulter les biens, documents, comptes et échéances.</p>
       <p class="readonly-note">V1.1.2 : la SCI active est lue depuis <strong>users/{UID}.activeSci</strong>. SCI Claudine doit utiliser <strong>scis/default</strong> pour tous les gérants.</p>
+    </div>
+    <div class="card settings-firebase-card" style="cursor:default">
+      <div class="card-hd"><div><div class="card-title">🔥 Firebase et déploiement</div><div class="card-sub">Diagnostic de la structure active</div></div></div>
+      <div class="divider"></div>
+      <div class="settings-info-list">
+        <div><span>Projet</span><strong id="firebase-project-id">—</strong></div>
+        <div><span>Structure active</span><strong id="firebase-active-sci">—</strong></div>
+        <div><span>Chemin données</span><strong id="firebase-active-path">—</strong></div>
+        <div><span>Profil</span><strong id="firebase-current-role">—</strong></div>
+      </div>
+      <div class="divider"></div>
+      <button class="btn-out" type="button" onclick="emergencyLocalReset()">Réinitialiser cache local</button>
+      <p class="readonly-note">À utiliser si l’application affiche d’anciennes données après une mise à jour ou un changement de structure.</p>
     </div>
   </div>
 </div>

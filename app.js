@@ -743,10 +743,33 @@ function closeModal(id){$(id).classList.remove('open');}
 function toast(msg){const t=$('toast');if(!t)return;t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
 function formatFirebaseError(err){
   if(!err) return 'Erreur inconnue';
-  if(err.code==='permission-denied' || String(err.message||'').includes('Missing or insufficient permissions')){
-    return 'Permission refusée Firebase : vérifie que cet utilisateur est gérant dans users/{UID}.scis pour la structure active, et que les règles Firestore autorisent la collection concernée (notamment associes).';
+  const code=String(err.code||'');
+  const msg=String(err.message||err);
+  if(code==='permission-denied' || msg.includes('Missing or insufficient permissions')){
+    return 'Droits insuffisants pour cette action. Vérifie que ton compte est bien gérant sur la structure active.';
   }
-  return err.message || String(err);
+  if(code==='unauthenticated' || code==='auth/requires-recent-login'){
+    return 'Session expirée. Déconnecte-toi puis reconnecte-toi.';
+  }
+  if(code==='unavailable' || code==='deadline-exceeded' || code==='auth/network-request-failed'){
+    return 'Connexion Firebase indisponible. Vérifie ta connexion puis réessaie.';
+  }
+  if(code==='resource-exhausted'){
+    return 'Quota Firebase atteint. Réessaie plus tard ou allège les documents stockés.';
+  }
+  if(code==='storage/unauthorized'){
+    return 'Droits insuffisants pour envoyer ce fichier.';
+  }
+  if(code==='storage/quota-exceeded'){
+    return 'Stockage Firebase plein. Supprime ou exporte des documents avant de continuer.';
+  }
+  if(code==='storage/retry-limit-exceeded'){
+    return 'Envoi interrompu. Vérifie la connexion et réessaie.';
+  }
+  if(msg.toLowerCase().includes('too large') || msg.toLowerCase().includes('maximum')){
+    return 'Document trop volumineux. Essaie un fichier plus léger.';
+  }
+  return msg || String(err);
 }
 async function saveWithFeedback(promise, successMsg){
   try{
@@ -922,7 +945,19 @@ function openSCISetupHelp(){
   alert('Pour ajouter une structure : crée scis/{sciId}, puis ajoute cette structure dans users/{uid}.scis et scis/{sciId}/members/{uid}. Pour le GFA, utilise sciId = gfa_familial. Les accès peuvent être les mêmes personnes que SCI Claudine, mais les données restent séparées.');
 }
 
-function renderParametres(){ loadAccountProfile(); renderStorageUsage(); renderSCISwitcher(); }
+function renderFirebaseDiagnostics(){
+  const set=(id,val)=>{const el=$(id); if(el) el.textContent=val || '—';};
+  set('firebase-project-id', firebase?.app?.().options?.projectId || '—');
+  set('firebase-active-sci', entityName());
+  set('firebase-active-path', 'scis/'+activeDocId());
+  set('firebase-current-role', APP_STATE.role==='gerant'?'Gérant':'Associé');
+}
+function renderParametres(){
+  loadAccountProfile();
+  renderStorageUsage();
+  renderSCISwitcher();
+  renderFirebaseDiagnostics();
+}
 
 function renderGFA(){
   applyEntityUI();
