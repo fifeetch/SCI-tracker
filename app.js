@@ -228,6 +228,9 @@ function showAuthError(msg){
   if(el){
     el.textContent = msg;
     el.style.display = 'block';
+    el.style.background = 'rgba(224,90,75,.12)';
+    el.style.borderColor = 'var(--red)';
+    el.style.color = 'var(--red)';
   }
   console.warn('[AUTH]', msg);
 }
@@ -238,18 +241,31 @@ function clearAuthError(){
     el.style.display = 'none';
   }
 }
+function showAuthInfo(msg){
+  const el = document.getElementById('auth-error');
+  if(el){
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = 'rgba(76,175,130,.12)';
+    el.style.borderColor = 'var(--green)';
+    el.style.color = 'var(--green)';
+  }
+}
 function setAuthLoading(isLoading, label){
   const login = document.getElementById('btn-login');
   const register = document.getElementById('btn-register');
-  [login, register].forEach(btn=>{
+  const reset = document.getElementById('btn-reset-password');
+  [login, register, reset].forEach(btn=>{
     if(!btn) return;
     btn.disabled = !!isLoading;
     btn.style.opacity = isLoading ? '.65' : '1';
     btn.style.cursor = isLoading ? 'wait' : 'pointer';
   });
   if(label && register) register.textContent = label;
+  if(label && reset) reset.textContent = label;
   if(!isLoading && register) register.textContent = 'Créer un compte';
   if(!isLoading && login) login.textContent = 'Se connecter';
+  if(!isLoading && reset) reset.textContent = 'Mot de passe oublié ?';
 }
 function getAuthInputs(){
   const emailEl = document.getElementById('auth-email');
@@ -283,6 +299,21 @@ function validateAuthInputs(mode){
   clearAuthError();
   return { email, pass };
 }
+function validateResetEmail(){
+  const { email, emailEl } = getAuthInputs();
+  if(!email){
+    showAuthError('Saisis ton email pour recevoir le lien de réinitialisation.');
+    emailEl?.focus();
+    return null;
+  }
+  if(!email.includes('@')){
+    showAuthError('Email invalide : il manque probablement le @.');
+    emailEl?.focus();
+    return null;
+  }
+  clearAuthError();
+  return email;
+}
 
 // ══ AUTH FONCTIONS (directement sur window) ══
 window.doLogin = async function(){
@@ -303,6 +334,26 @@ window.doLogin = async function(){
       'auth/network-request-failed':'Problème réseau : vérifie ta connexion.'
     };
     showAuthError(m[err.code]||('Erreur connexion : '+err.message));
+  } finally {
+    setAuthLoading(false);
+  }
+};
+
+window.resetPassword = async function(){
+  const email = validateResetEmail();
+  if(!email) return;
+  try{
+    setAuthLoading(true, 'Envoi du lien...');
+    await auth.sendPasswordResetEmail(email);
+    showAuthInfo('Email de réinitialisation envoyé. Vérifie ta boîte mail et tes indésirables.');
+  } catch(err){
+    console.error('[AUTH RESET ERROR]', err);
+    const m={
+      'auth/user-not-found':'Aucun compte trouvé avec cet email.',
+      'auth/invalid-email':'Email invalide.',
+      'auth/network-request-failed':'Problème réseau : vérifie ta connexion.'
+    };
+    showAuthError(m[err.code]||('Erreur réinitialisation : '+err.message));
   } finally {
     setAuthLoading(false);
   }
