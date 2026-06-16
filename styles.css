@@ -735,8 +735,24 @@
 
   /* Paramètres : exports plus visibles */
   .settings-export-card{border-color:rgba(31,157,133,.22)!important;}
+  .settings-hub{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin:6px 0 18px;}
+  .settings-tile{min-height:138px;text-align:left;border:1px solid var(--border);background:rgba(255,255,255,.84);color:var(--text);border-radius:20px;padding:16px;cursor:pointer;font-family:'DM Sans',sans-serif;display:grid;grid-template-rows:auto auto 1fr auto;gap:6px;box-shadow:0 10px 28px rgba(11,36,77,.06);transition:.2s;}
+  .settings-tile:hover{transform:translateY(-2px);border-color:var(--v2-mint);box-shadow:0 16px 34px rgba(11,36,77,.10);}
+  .settings-tile.active{border-color:rgba(31,157,133,.42);background:linear-gradient(135deg,rgba(31,157,133,.14),rgba(47,110,203,.08));}
+  .settings-tile.danger{border-color:rgba(214,69,61,.26);}
+  .settings-tile.danger.active{border-color:rgba(214,69,61,.48);background:linear-gradient(135deg,rgba(214,69,61,.12),rgba(255,255,255,.82));}
+  .settings-tile span{font-size:24px;line-height:1;}
+  .settings-tile strong{font-size:14px;line-height:1.2;color:var(--text);}
+  .settings-tile small{font-size:11px;line-height:1.35;color:var(--text2);}
+  .settings-tile b{font-size:11px;color:var(--v2-blue);font-weight:900;}
+  .settings-detail-head{border:1px solid var(--border);border-radius:22px;padding:18px 20px;margin-bottom:16px;background:rgba(255,255,255,.78);box-shadow:0 10px 28px rgba(11,36,77,.05);}
+  .settings-detail-head span{display:block;text-transform:uppercase;letter-spacing:1.2px;font-size:10px;font-weight:900;color:var(--text3);margin-bottom:5px;}
+  .settings-detail-head h3{font-family:var(--font-title);font-size:22px;margin:0;color:var(--text);}
+  .settings-detail-head p{font-size:13px;color:var(--text2);margin-top:4px;}
   .settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
   .settings-section-title{grid-column:1 / -1;font-size:11px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;color:var(--text3);margin:4px 0 -4px;}
+  .settings-section-hidden{display:none!important;}
+  .settings-danger-card{border-color:rgba(214,69,61,.34)!important;background:linear-gradient(135deg,rgba(214,69,61,.08),rgba(255,255,255,.82));}
   .settings-export-intro{display:grid;gap:5px;background:linear-gradient(135deg,rgba(31,157,133,.12),rgba(47,110,203,.08));border:1px solid rgba(31,157,133,.20);border-radius:14px;padding:14px 16px;margin-bottom:14px;}
   .settings-export-intro strong{font-size:13px;color:var(--text);}
   .settings-export-intro span{font-size:12px;color:var(--text2);line-height:1.45;}
@@ -755,11 +771,17 @@
   .settings-info-list span{color:var(--text2);font-weight:700;}
   .settings-info-list strong{color:var(--text);text-align:right;word-break:break-word;}
   .settings-firebase-card{border-color:rgba(47,110,203,.22)!important;}
+  @media(max-width:1100px){.settings-hub{grid-template-columns:repeat(2,minmax(0,1fr));}.settings-tile{min-height:118px;}}
   @media(max-width:900px){.settings-export-actions{grid-template-columns:1fr}.settings-export-action{min-height:auto}.settings-export-csv{grid-template-columns:1fr}.settings-export-csv .btn-out{width:100%;}}
+  @media(max-width:640px){.settings-hub{grid-template-columns:1fr}.settings-tile{min-height:auto}.settings-detail-head{padding:16px;border-radius:18px}.settings-grid{grid-template-columns:1fr;}}
   [data-theme="dark"] .settings-export-intro{background:linear-gradient(135deg,rgba(230,189,99,.12),rgba(47,110,203,.10));border-color:rgba(230,189,99,.20);}
   [data-theme="dark"] .settings-export-action{background:rgba(7,26,58,.44);border-color:rgba(170,199,236,.16);}
   [data-theme="dark"] .settings-export-action.primary{background:linear-gradient(135deg,#e6bd63,#f1d99a);}
   [data-theme="dark"] .settings-info-list div{background:rgba(7,26,58,.44);border-color:rgba(170,199,236,.16);}
+  [data-theme="dark"] .settings-tile,[data-theme="dark"] .settings-detail-head{background:rgba(16,47,96,.72);border-color:rgba(170,199,236,.16);}
+  [data-theme="dark"] .settings-tile.active{background:linear-gradient(135deg,rgba(230,189,99,.14),rgba(47,110,203,.12));border-color:rgba(230,189,99,.30);}
+  [data-theme="dark"] .settings-tile.danger.active{background:linear-gradient(135deg,rgba(214,69,61,.16),rgba(7,26,58,.72));}
+  [data-theme="dark"] .settings-danger-card{background:linear-gradient(135deg,rgba(214,69,61,.12),rgba(7,26,58,.62));}
 
 
   /* ── COMPTABILITÉ V1.3.3 : recherche + import Crédit Agricole + solde ── */

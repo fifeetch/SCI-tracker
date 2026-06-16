@@ -957,6 +957,30 @@ function renderParametres(){
   renderStorageUsage();
   renderSCISwitcher();
   renderFirebaseDiagnostics();
+  selectSettingsSection(window.__activeSettingsSection || 'account');
+}
+
+function selectSettingsSection(section){
+  const meta={
+    account:['Mon compte','Profil et apparence','Informations personnelles, photo de profil et thème de l’application.'],
+    backup:['Sauvegardes','Données et exports','Stockage documents, sauvegarde complète, Excel, ZIP et exports CSV.'],
+    access:['Sécurité & accès','Droits utilisateurs','Rappel des permissions entre gérants et associés.'],
+    firebase:['Firebase','Diagnostic technique','Projet, structure active, chemin des données et cache local.'],
+    danger:['Zone danger','Actions sensibles','Opérations irréversibles à utiliser uniquement en connaissance de cause.']
+  };
+  const key=meta[section]?section:'account';
+  window.__activeSettingsSection=key;
+  document.querySelectorAll('[data-settings-section]').forEach(el=>{
+    el.classList.toggle('settings-section-hidden', el.dataset.settingsSection!==key);
+  });
+  document.querySelectorAll('.settings-tile').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.settingsTarget===key);
+  });
+  const [eyebrow,title,subtitle]=meta[key];
+  const e=$('settings-active-eyebrow'), t=$('settings-active-title'), s=$('settings-active-subtitle');
+  if(e) e.textContent=eyebrow;
+  if(t) t.textContent=title;
+  if(s) s.textContent=subtitle;
 }
 
 function renderGFA(){

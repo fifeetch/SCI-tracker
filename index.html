@@ -830,11 +830,35 @@
 <div id="page-parametres" class="page">
   <div class="back-btn" onclick="goPage('home')">← Retour</div>
   <div class="sec-hdr">
-    <div><h2>Paramètres</h2><p>Compte, sauvegardes, accès et diagnostic Firebase</p></div>
+    <div><h2>Paramètres</h2><p>Choisis une rubrique pour gérer le compte, les sauvegardes, les accès ou Firebase.</p></div>
+  </div>
+  <div class="settings-hub" aria-label="Rubriques paramètres">
+    <button class="settings-tile active" type="button" data-settings-target="account" onclick="selectSettingsSection('account')">
+      <span>👤</span><strong>Mon compte</strong><small>Profil, photo, email et thème</small><b>Ouvrir ›</b>
+    </button>
+    <button class="settings-tile" type="button" data-settings-target="backup" onclick="selectSettingsSection('backup')">
+      <span>💾</span><strong>Sauvegardes</strong><small>Stockage, JSON, Excel, ZIP et CSV</small><b>Ouvrir ›</b>
+    </button>
+    <button class="settings-tile" type="button" data-settings-target="access" onclick="selectSettingsSection('access')">
+      <span>🔐</span><strong>Sécurité & accès</strong><small>Droits gérant ou associé</small><b>Ouvrir ›</b>
+    </button>
+    <button class="settings-tile" type="button" data-settings-target="firebase" onclick="selectSettingsSection('firebase')">
+      <span>🔥</span><strong>Firebase</strong><small>Projet, structure et cache local</small><b>Ouvrir ›</b>
+    </button>
+    <button class="settings-tile danger" type="button" data-settings-target="danger" onclick="selectSettingsSection('danger')">
+      <span>⚠️</span><strong>Zone danger</strong><small>Actions irréversibles</small><b>Ouvrir ›</b>
+    </button>
+  </div>
+  <div class="settings-detail-head">
+    <div>
+      <span id="settings-active-eyebrow">Mon compte</span>
+      <h3 id="settings-active-title">Profil et apparence</h3>
+      <p id="settings-active-subtitle">Informations personnelles, photo de profil et thème de l’application.</p>
+    </div>
   </div>
   <div class="settings-grid">
-    <div class="settings-section-title">Compte et apparence</div>
-    <div class="card" style="cursor:default">
+    <div class="settings-section-title" data-settings-section="account">Compte et apparence</div>
+    <div class="card" data-settings-section="account" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">👤 Mon compte</div><div class="card-sub" id="account-email">—</div><div class="card-sub">Profil : <strong id="account-role">—</strong></div><div class="card-sub">SCI : <strong id="account-sci">—</strong></div></div></div>
       <div class="divider"></div>
       <div class="frow">
@@ -860,14 +884,14 @@
         <button class="btn-del" type="button" onclick="doLogout()">Se déconnecter</button>
       </div>
     </div>
-    <div class="card" style="cursor:default">
+    <div class="card" data-settings-section="account" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">🎨 Apparence</div><div class="card-sub">Mode clair / sombre</div></div></div>
       <div class="divider"></div>
       <button class="btn-out" type="button" onclick="toggleTheme()">Changer le thème</button>
       <p class="readonly-note">Le mode clair est utilisé par défaut. Le choix est mémorisé sur cet appareil.</p>
     </div>
-    <div class="settings-section-title">Sauvegarde et stockage</div>
-    <div class="card" style="cursor:default">
+    <div class="settings-section-title" data-settings-section="backup">Sauvegarde et stockage</div>
+    <div class="card" data-settings-section="backup" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">💾 Stockage documents</div><div class="card-sub">Estimation Firestore gratuit — limite 1 Go</div></div></div>
       <div class="divider"></div>
       <div class="storage-meter">
@@ -877,7 +901,7 @@
         <p style="font-size:12px;color:var(--text2);line-height:1.5;margin-top:10px">Estimation basée sur la taille des fichiers importés + surcoût base64/chunks. Les images sont compressées automatiquement avant stockage.</p>
       </div>
     </div>
-    <div class="card settings-export-card" style="cursor:default">
+    <div class="card settings-export-card" data-settings-section="backup" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">📤 Sauvegarde et exports</div><div class="card-sub">Données complètes, fichiers et exports par module</div></div></div>
       <div class="divider"></div>
       <div class="settings-export-intro">
@@ -918,20 +942,22 @@
       </div>
       <p class="readonly-note">JSON pour la sauvegarde complète, Excel pour la lecture, ZIP pour archiver les pièces jointes, CSV pour travailler un module précis.</p>
     </div>
-    <div class="settings-section-title">Technique et accès</div>
-    <div class="card write-only" style="cursor:default">
+    <div class="settings-section-title" data-settings-section="danger">Zone danger</div>
+    <div class="card write-only settings-danger-card" data-settings-section="danger" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">🧹 Base de données</div><div class="card-sub">Données de démonstration</div></div></div>
       <div class="divider"></div>
       <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">Cette version ne recrée plus les données d’exemple. Utilise ce bouton une seule fois pour vider les biens, locataires, associés, opérations, documents, échéances, messages et décisions existants.</p>
       <button class="btn-del" type="button" onclick="resetSCIData()">Vider la base SCI</button>
     </div>
-    <div class="card" style="cursor:default">
+    <div class="settings-section-title" data-settings-section="access">Sécurité et accès</div>
+    <div class="card" data-settings-section="access" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">🔐 Droits d’accès</div><div class="card-sub">Gérant ou associé</div></div></div>
       <div class="divider"></div>
       <p style="font-size:13px;color:var(--text2);line-height:1.6">Les gérants peuvent tout modifier. Les associés peuvent uniquement consulter les biens, documents, comptes et échéances.</p>
       <p class="readonly-note">V1.1.2 : la SCI active est lue depuis <strong>users/{UID}.activeSci</strong>. SCI Claudine doit utiliser <strong>scis/default</strong> pour tous les gérants.</p>
     </div>
-    <div class="card settings-firebase-card" style="cursor:default">
+    <div class="settings-section-title" data-settings-section="firebase">Firebase et déploiement</div>
+    <div class="card settings-firebase-card" data-settings-section="firebase" style="cursor:default">
       <div class="card-hd"><div><div class="card-title">🔥 Firebase et déploiement</div><div class="card-sub">Diagnostic de la structure active</div></div></div>
       <div class="divider"></div>
       <div class="settings-info-list">
