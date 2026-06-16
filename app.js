@@ -1041,6 +1041,76 @@ function getHomeChartConfig(){
   return DEFAULT_HOME_CHART_CONFIG.slice();
 }
 function setHomeChartConfig(arr){ localStorage.setItem(homeChartStorageKey(), JSON.stringify(arr)); }
+const HOME_ACTION_DEFS = [
+  {key:'journal', title:'Journal comptable', desc:'Ajouter ou vérifier une opération', run:"goComptaSection('section-journal')"},
+  {key:'preparation', title:'Préparation comptable', desc:'Suivre les justificatifs manquants', run:"goComptaSection('compta-preparation')"},
+  {key:'documents', title:'Documents', desc:'Rechercher ou classer une pièce', run:"goPage('documents')"},
+  {key:'agenda', title:'Agenda', desc:'Créer ou vérifier un rendez-vous', run:"goPage('echeances')"},
+  {key:'votes', title:'Votes', desc:'Ouvrir les décisions en cours', run:"goPage('associes')"},
+  {key:'messages', title:'Messages', desc:'Lire les échanges internes', run:"goPage('communication')"},
+  {key:'alertes', title:'Alertes', desc:'Votes, rendez-vous et éléments à traiter', run:"openAlertsModal()", alert:true}
+];
+const HOME_ALERT_DEFS = [
+  {key:'flagged', title:'Alertes manuelles'},
+  {key:'vote', title:'Votes en attente'},
+  {key:'reunion', title:'Rendez-vous agenda'},
+  {key:'document', title:'Documents'},
+  {key:'message', title:'Messages'}
+];
+const DEFAULT_HOME_ACTION_KEYS = ['journal','preparation','documents','alertes'];
+const DEFAULT_HOME_ALERT_KEYS = HOME_ALERT_DEFS.map(x=>x.key);
+function homePreferencesStorageKey(){
+  const uid = (window.auth && auth.currentUser && auth.currentUser.uid) ? auth.currentUser.uid : 'local';
+  const sci = (typeof SCI_ID !== 'undefined' && SCI_ID) ? SCI_ID : (APP_STATE?.currentSCI?.id || 'default');
+  return 'sciFamily.homePrefs.v1.'+uid+'.'+sci;
+}
+function getHomePreferences(){
+  try{
+    const raw=localStorage.getItem(homePreferencesStorageKey());
+    const parsed=raw?JSON.parse(raw):{};
+    return {
+      actions:Array.isArray(parsed.actions)?parsed.actions.filter(k=>HOME_ACTION_DEFS.some(d=>d.key===k)):DEFAULT_HOME_ACTION_KEYS.slice(),
+      alerts:Array.isArray(parsed.alerts)?parsed.alerts.filter(k=>HOME_ALERT_DEFS.some(d=>d.key===k)):DEFAULT_HOME_ALERT_KEYS.slice()
+    };
+  }catch(e){ return {actions:DEFAULT_HOME_ACTION_KEYS.slice(),alerts:DEFAULT_HOME_ALERT_KEYS.slice()}; }
+}
+function setHomePreferences(prefs){ localStorage.setItem(homePreferencesStorageKey(), JSON.stringify(prefs)); }
+function renderHomeQuickActions(){
+  const box=document.getElementById('home-action-list'); if(!box) return;
+  const prefs=getHomePreferences();
+  const keys=prefs.actions.length?prefs.actions:DEFAULT_HOME_ACTION_KEYS;
+  box.innerHTML=keys.map(key=>{
+    const def=HOME_ACTION_DEFS.find(d=>d.key===key); if(!def) return '';
+    const cls=def.alert?' home-action-alert':'';
+    const end=def.alert?'<span class="alert-mini-badge" id="home-action-alert-count-2">0</span>':'<span>→</span>';
+    return `<div class="home-action${cls}" onclick="${def.run}"><div><strong>${esc(def.title)}</strong><br><span>${esc(def.desc)}</span></div>${end}</div>`;
+  }).join('') || '<div class="home-action"><div><strong>Aucune action</strong><br><span>Ajoute un raccourci depuis Configurer</span></div><span>→</span></div>';
+}
+function openHomePreferencesModal(){
+  const prefs=getHomePreferences();
+  const actionBox=document.getElementById('home-action-config-list');
+  const alertBox=document.getElementById('home-alert-config-list');
+  if(actionBox) actionBox.innerHTML=HOME_ACTION_DEFS.map(d=>`<label class="check-line"><input type="checkbox" class="home-action-pref" value="${d.key}" ${prefs.actions.includes(d.key)?'checked':''}>${esc(d.title)}<span>${esc(d.desc)}</span></label>`).join('');
+  if(alertBox) alertBox.innerHTML=HOME_ALERT_DEFS.map(d=>`<label class="check-line"><input type="checkbox" class="home-alert-pref" value="${d.key}" ${prefs.alerts.includes(d.key)?'checked':''}>${esc(d.title)}</label>`).join('');
+  openModal('m-home-preferences');
+}
+function saveHomePreferences(){
+  const actions=Array.from(document.querySelectorAll('.home-action-pref:checked')).map(x=>x.value);
+  const alerts=Array.from(document.querySelectorAll('.home-alert-pref:checked')).map(x=>x.value);
+  if(!actions.length){ alert('Garde au moins une action rapide.'); return; }
+  if(!alerts.length){ alert('Garde au moins un type d’alerte.'); return; }
+  setHomePreferences({actions,alerts});
+  closeModal('m-home-preferences');
+  renderHomeQuickActions();
+  renderHome();
+  toast('Accueil personnalisé ✓');
+}
+function resetHomePreferences(){
+  try{ localStorage.removeItem(homePreferencesStorageKey()); }catch(e){}
+  openHomePreferencesModal();
+  renderHomeQuickActions();
+  renderHome();
+}
 function applyHomeKpiConfig(){
   const grid = document.querySelector('.home-kpi-grid'); if(!grid) return;
   const cfg = getHomeKpiConfig();
@@ -1277,6 +1347,7 @@ function renderHome(){
   set('s-taux-occupation', kdata.occupation===null ? 'Donnée insuff.' : (kdata.occupation+' %'));
   set('s-prep-comptable', kdata.prepComptable===null ? 'Donnée insuff.' : (kdata.prepComptable+' %'));
   set('s-alertes-fiscales', kdata.fiscal||0);
+  try{ renderHomeQuickActions(); }catch(e){ console.warn('Actions rapides non rendues', e); }
   set('home-occupation',occupation+'%');set('home-alert-kpi',alertCount||0);set('home-action-alert-count',alertCount||0);set('home-action-alert-count-2',alertCount||0);
   const ac=$('home-alert-card'); if(ac) ac.classList.toggle('alert-active',alertCount>0);
   try{ applyHomeKpiConfig(); }catch(e){ console.warn('Config KPI non appliquée', e); }
@@ -3114,7 +3185,8 @@ function decisionCardHtml(d){
   const w=decisionWeights(d), st=decisionStatus(d), archived=!!d.archive?.archived, my=(d.votes||[]).find(v=>v.voterUid===auth.currentUser?.uid);
   const voteButtons=archived?`<span class="tag tb">Vote clôturé — archive non modifiable</span>`:`<button class="vote-btn" onclick="voteDecision(${d.id},'pour')">✅ Pour</button><button class="vote-btn" onclick="voteDecision(${d.id},'contre')">❌ Contre</button><button class="vote-btn" onclick="voteDecision(${d.id},'abstention')">➖ Abstention</button>${my?`<span class="tag tb">Votre vote : ${my.vote}</span>`:''}`;
   const archiveBtn=canWrite()&&!archived?`<button class="vote-btn" style="border-color:var(--blue);color:var(--blue)" onclick="archiveDecision(${d.id})">📦 Clôturer / archiver</button>`:'';
-  return `<div class="card" onclick="${canWrite()&&!archived?`openDecisionModal(${d.id})`:'void(0)'}"><div class="card-hd"><div><div class="card-title">${esc(d.title||'Décision sans titre')}</div><div class="card-sub">${esc(d.type||'autre')} · ${d.deadline?('limite '+fmtDate(d.deadline)):'pas de limite'} ${d.bien?'· '+esc(d.bien):''}</div></div><div style="display:flex;align-items:center;gap:8px">${!archived?`<button class="flag-btn write-only" onclick="event.stopPropagation();flagItem('decision',${d.id},'Vote à traiter','${esc(d.title||'Décision')}')">!</button>`:''}<span class="decision-status ${archived?'archived':st}">${statusLabel(st,archived)}</span></div></div><div class="divider"></div><div class="info-row"><span>Montant</span><span>${(+d.montant||0).toLocaleString('fr-FR')} €</span></div><div class="msg-body">${esc(d.description||'')}</div><div class="vote-summary"><div class="vote-pill"><strong style="color:var(--green)">${w.pour}</strong>Pour</div><div class="vote-pill"><strong style="color:var(--red)">${w.contre}</strong>Contre</div><div class="vote-pill"><strong>${w.abstention}</strong>Abst.</div></div><div class="readonly-note" style="margin-top:8px">Vote : 1 associé = 1 voix · ${w.totalVotes}/${w.totalAssocies} vote(s)</div>${decisionEmailStatusHtml(d,w)}${decisionArchiveHtml(d)}<div class="vote-row" onclick="event.stopPropagation()">${voteButtons}${archiveBtn}</div></div>`;
+  const deleteBtn=canWrite()&&!archived?`<button class="vote-btn vote-delete-btn" onclick="confirmDel('decision',${d.id})">🗑 Supprimer</button>`:'';
+  return `<div class="card" onclick="${canWrite()&&!archived?`openDecisionModal(${d.id})`:'void(0)'}"><div class="card-hd"><div><div class="card-title">${esc(d.title||'Décision sans titre')}</div><div class="card-sub">${esc(d.type||'autre')} · ${d.deadline?('limite '+fmtDate(d.deadline)):'pas de limite'} ${d.bien?'· '+esc(d.bien):''}</div></div><div style="display:flex;align-items:center;gap:8px">${!archived?`<button class="flag-btn write-only" onclick="event.stopPropagation();flagItem('decision',${d.id},'Vote à traiter','${esc(d.title||'Décision')}')">!</button>`:''}<span class="decision-status ${archived?'archived':st}">${statusLabel(st,archived)}</span></div></div><div class="divider"></div><div class="info-row"><span>Montant</span><span>${(+d.montant||0).toLocaleString('fr-FR')} €</span></div><div class="msg-body">${esc(d.description||'')}</div><div class="vote-summary"><div class="vote-pill"><strong style="color:var(--green)">${w.pour}</strong>Pour</div><div class="vote-pill"><strong style="color:var(--red)">${w.contre}</strong>Contre</div><div class="vote-pill"><strong>${w.abstention}</strong>Abst.</div></div><div class="readonly-note" style="margin-top:8px">Vote : 1 associé = 1 voix · ${w.totalVotes}/${w.totalAssocies} vote(s)</div>${decisionEmailStatusHtml(d,w)}${decisionArchiveHtml(d)}<div class="vote-row" onclick="event.stopPropagation()">${voteButtons}${archiveBtn}${deleteBtn}</div></div>`;
 }
 function renderDecisions(){
   const list=window.CACHE?.decisions||[];
@@ -3202,7 +3274,8 @@ function renderEch(){
 }
 function echItemHtml(e){
   const u=echUrgency(e),dl=echDaysLabel(e);
-  const sub=[e.bien,e.loc,e.mt?e.mt.toLocaleString('fr-FR')+' €':''].filter(Boolean).join(' · ');
+  const timing=[e.heure||'', e.duree?e.duree+' min':''].filter(Boolean).join(' · ');
+  const sub=[timing,e.bien,e.loc,e.mt?e.mt.toLocaleString('fr-FR')+' €':''].filter(Boolean).join(' · ');
   return `<div class="ech-item${e.done?' done-item':''}" onclick="openEchModal(${e.id})">
     <div class="ech-icon">${ECH_ICONS[e.type]||'📌'}</div>
     <div class="ech-body"><div class="ech-title">${e.titre}</div><div class="ech-sub">${ECH_LABELS[e.type]||'Autre'}${sub?' · '+sub:''}</div>${e.notes?`<div class="ech-sub" style="font-style:italic">${e.notes}</div>`:''}</div>
@@ -3237,14 +3310,14 @@ function openEchModal(id){
   $('mech-t').innerHTML=e?'📅 Modifier &nbsp;<span class="mbadge">Édition</span>':'📅 Nouvelle échéance';
   $('ech-del').style.display=e?'block':'none';
   renderInviteLists(ec?.guests?.map(g=>g.email)||[]);
-  if(e&&ec){sv('ech-id',ec.id);sv('ech-titre',ec.titre);sv('ech-date',ec.date);sv('ech-type',ec.type);sv('ech-heure',ec.heure||'');sv('ech-lieu',ec.lieu||'');if(sb)sb.value=ec.bien||'';if(sl)sl.value=ec.loc||'';sv('ech-mt',ec.mt||'');sv('ech-notes',ec.notes||'');const ed=$('ech-done');if(ed)ed.checked=!!ec.done;}
-  else{sv('ech-id','');sv('ech-titre','');sv('ech-mt','');sv('ech-notes','');sv('ech-type','bail');sv('ech-heure','');sv('ech-lieu','');if(sb)sb.value='';if(sl)sl.value='';const ed=$('ech-done');if(ed)ed.checked=false;const dd=new Date();dd.setDate(dd.getDate()+30);sv('ech-date',dd.toISOString().split('T')[0]);}
+  if(e&&ec){sv('ech-id',ec.id);sv('ech-titre',ec.titre);sv('ech-date',ec.date);sv('ech-type',ec.type);sv('ech-heure',ec.heure||'');sv('ech-duree',ec.duree||'');sv('ech-lieu',ec.lieu||'');if(sb)sb.value=ec.bien||'';if(sl)sl.value=ec.loc||'';sv('ech-mt',ec.mt||'');sv('ech-notes',ec.notes||'');const ed=$('ech-done');if(ed)ed.checked=!!ec.done;}
+  else{sv('ech-id','');sv('ech-titre','');sv('ech-mt','');sv('ech-notes','');sv('ech-type','bail');sv('ech-heure','');sv('ech-duree','60');sv('ech-lieu','');if(sb)sb.value='';if(sl)sl.value='';const ed=$('ech-done');if(ed)ed.checked=false;const dd=new Date();dd.setDate(dd.getDate()+30);sv('ech-date',dd.toISOString().split('T')[0]);}
   toggleReunionFields();
   openModal('m-ech');
 }
 async function saveEch(){
   const id=v('ech-id'),e=!!id,sb=$('ech-bien'),sl=$('ech-loc'),ed=$('ech-done');
-  const obj={id:e?+id:Date.now(),titre:v('ech-titre'),date:v('ech-date'),type:v('ech-type'),bien:sb?.value||'',loc:sl?.value||'',mt:+v('ech-mt')||0,notes:v('ech-notes'),done:ed?.checked||false,heure:v('ech-heure'),lieu:v('ech-lieu'),guests:selectedMeetingGuests()};
+  const obj={id:e?+id:Date.now(),titre:v('ech-titre'),date:v('ech-date'),type:v('ech-type'),bien:sb?.value||'',loc:sl?.value||'',mt:+v('ech-mt')||0,notes:v('ech-notes'),done:ed?.checked||false,heure:v('ech-heure'),duree:+v('ech-duree')||0,lieu:v('ech-lieu'),guests:selectedMeetingGuests()};
   const ok = await saveWithFeedback(window.dbSet?.('echs',obj), e?'Échéance mise à jour ✓':'Échéance ajoutée ✓');
   if(ok) closeModal('m-ech');
 }
@@ -3259,6 +3332,7 @@ Vous êtes convié(e) à une réunion SCI Family.
 Sujet : ${v('ech-titre')}
 Date : ${fmtDate(v('ech-date'))}
 Heure : ${v('ech-heure')||'à préciser'}
+Durée : ${v('ech-duree')?v('ech-duree')+' minutes':'à préciser'}
 Lieu / Visio : ${v('ech-lieu')||'à préciser'}
 
 Ordre du jour / notes :
@@ -3277,9 +3351,17 @@ SCI Family`;
 function myVotedDecision(d){ return (d.votes||[]).some(v=>v.voterUid===auth.currentUser?.uid); }
 function getPendingItems(){
   const uid=auth.currentUser?.uid||'';
-  const decisions=(window.CACHE?.decisions||[]).filter(d=>decisionStatus(d)==='pending'&&!myVotedDecision(d)).map(d=>({type:'vote',title:'Vote en attente',text:d.title||'Décision à voter',action:()=>{closeModal('m-alerts');goPage('associes');}}));
-  const flagged=(window.CACHE?.alerts||[]).filter(a=>!(a.dismissedBy||[]).includes(uid)).map(a=>({type:a.type||'alerte',title:a.title||'Alerte',text:a.text||'',id:a.id,action:()=>openAlertTarget(a)}));
-  const meetings=(window.CACHE?.echs||[]).filter(e=>!e.done&&e.type==='reunion'&&new Date(e.date)>=new Date()).slice(0,3).map(e=>({type:'reunion',title:'Réunion à venir',text:(e.titre||'Réunion')+' · '+fmtDate(e.date)+(e.heure?' à '+e.heure:''),action:()=>{closeModal('m-alerts');goPage('echeances');}}));
+  const prefs=getHomePreferences();
+  const allowed=new Set(prefs.alerts||DEFAULT_HOME_ALERT_KEYS);
+  const decisions=allowed.has('vote')?(window.CACHE?.decisions||[]).filter(d=>decisionStatus(d)==='pending'&&!myVotedDecision(d)).map(d=>({type:'vote',title:'Vote en attente',text:d.title||'Décision à voter',action:()=>{closeModal('m-alerts');goPage('associes');}})):[];
+  const flagged=(window.CACHE?.alerts||[]).filter(a=>!(a.dismissedBy||[]).includes(uid)).filter(a=>{
+    const t=a.type||'flagged';
+    return allowed.has(t) || (t==='alerte'&&allowed.has('flagged'));
+  }).map(a=>({type:a.type||'alerte',title:a.title||'Alerte',text:a.text||'',id:a.id,action:()=>openAlertTarget(a)}));
+  const meetings=allowed.has('reunion')?(window.CACHE?.echs||[]).filter(e=>!e.done&&e.type==='reunion'&&new Date(e.date)>=new Date()).sort((a,b)=>new Date(a.date)-new Date(b.date)).map(e=>{
+    const details=[fmtDate(e.date), e.heure?'à '+e.heure:'', e.duree?e.duree+' min':''].filter(Boolean).join(' · ');
+    return {type:'reunion',title:'Rendez-vous à venir',text:(e.titre||'Réunion')+' · '+details,action:()=>{closeModal('m-alerts');goPage('echeances');}};
+  }):[];
   return [...flagged,...decisions,...meetings];
 }
 function renderHomeAlerts(){

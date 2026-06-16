@@ -1043,6 +1043,17 @@ header{overflow:visible!important;}
 .home-action:hover{border-color:var(--v2-mint);}
 [data-theme="dark"] .home-action:hover{border-color:#e6bd63;}
 .home-action strong{font-size:13px;}.home-action span{font-size:12px;color:var(--text2);}
+.home-pref-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;}
+.home-pref-grid h4{font-size:13px;margin:0 0 10px;color:var(--text);}
+.pref-check-list{display:grid;gap:8px;}
+.pref-check-list .check-line{align-items:flex-start;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin:0;}
+.pref-check-list .check-line span{display:block;color:var(--text2);font-size:11px;margin-top:2px;}
+.vote-delete-btn{border-color:rgba(214,69,61,.45)!important;color:var(--red)!important;}
+.vote-delete-btn:hover{background:rgba(214,69,61,.10)!important;}
+.vie-sci-page .vie-hero{background:rgba(255,255,255,.82)!important;border-radius:22px!important;padding:22px 24px!important;box-shadow:0 10px 28px rgba(11,36,77,.06)!important;}
+[data-theme="dark"] .vie-sci-page .vie-hero{background:rgba(16,47,96,.72)!important;}
+.vie-sci-page .vie-hero h2{font-family:var(--font-ui)!important;font-size:24px!important;letter-spacing:0!important;line-height:1.2!important;margin-bottom:6px!important;}
+.vie-sci-page .vie-hero p{font-size:13px!important;line-height:1.45!important;max-width:620px!important;}
 .home-section-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 12px;}
 .home-section-label h3{font-size:17px;font-family:var(--font-title);margin:0;}
 .home-section-label span{font-size:12px;color:var(--text3);font-weight:750;}
@@ -1051,6 +1062,7 @@ header{overflow:visible!important;}
 @media(min-width:1025px){.page#page-home{max-width:1480px!important}.main-nav-general{flex-wrap:wrap;}}
 @media(max-width:1024px){.nav-item{display:contents}.nav-submenu{display:none!important}.home-grid-v21,.home-wide-panels{grid-template-columns:1fr}.home-kpi-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:640px){.home-kpi-hero,.home-visual-panel,.home-mini-panel{border-radius:22px;padding:16px}.home-kpi-head{flex-direction:column}.home-kpi-grid{grid-template-columns:1fr 1fr;gap:10px}.home-kpi-card{min-height:102px;padding:12px}.home-kpi-card strong{font-size:20px}.home-donut-row{grid-template-columns:1fr}.home-donut{margin:auto}.home-bars{height:100px}.home-score{width:100%;}}
+@media(max-width:640px){.home-pref-grid{grid-template-columns:1fr}.vie-sci-page .vie-hero h2{font-size:21px!important;}}
 
 /* ═══════════════════════════════════════════════════════════════
    V2.2 — Corrections demandées : nav déroulante + dashboard clair

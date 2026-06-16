@@ -139,13 +139,8 @@
           </div>
         </section>
         <section class="home-mini-panel">
-          <div class="home-panel-title"><h3>Actions rapides</h3><button class="btn-out btn-sm" id="home-action-alert-btn" onclick="openAlertsModal()">Alertes <span class="alert-mini-badge" id="home-action-alert-count">0</span></button></div>
-          <div class="home-action-list">
-            <div class="home-action" onclick="goComptaSection('section-journal')"><div><strong>Journal comptable</strong><br><span>Ajouter ou vérifier une opération</span></div><span>→</span></div>
-            <div class="home-action" onclick="goComptaSection('compta-preparation')"><div><strong>Préparation comptable</strong><br><span>Suivre les justificatifs manquants</span></div><span>→</span></div>
-            <div class="home-action" onclick="goPage('documents')"><div><strong>Documents</strong><br><span>Rechercher ou classer une pièce</span></div><span>→</span></div>
-            <div class="home-action home-action-alert" onclick="openAlertsModal()"><div><strong>Alertes</strong><br><span>Votes en attente, messages non lus, échéances urgentes</span></div><span class="alert-mini-badge" id="home-action-alert-count-2">0</span></div>
-          </div>
+          <div class="home-panel-title"><h3>Actions rapides</h3><button class="btn-out btn-sm" onclick="openHomePreferencesModal()">Configurer</button></div>
+          <div class="home-action-list" id="home-action-list"></div>
         </section>
       </div>
     </main>
@@ -538,8 +533,8 @@
 
   <section class="vie-hero">
     <div>
-      <h2>Associés, juridique et votes au même endroit</h2>
-      <p>Un espace unique pour suivre les associés, préparer les assemblées générales, voter les décisions et vérifier les règles statutaires.</p>
+      <h2>Vie de la SCI</h2>
+      <p>Associés, assemblées, votes et documents juridiques.</p>
     </div>
     <div class="vie-hero-actions">
       <button class="btn write-only" onclick="openAssocieModal(null)">+ Associé</button>
@@ -670,6 +665,28 @@
       <button class="btn-out" type="button" onclick="resetKpiConfig()">Réinitialiser</button>
       <button class="btn-out" type="button" onclick="closeModal('m-kpi-config')">Annuler</button>
       <button class="btn" type="button" onclick="saveKpiConfig()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-home-preferences">
+  <div class="modal">
+    <h3>Configurer l'accueil</h3>
+    <div class="kpi-config-help">Choisis les raccourcis visibles sur l'accueil et les types d'alertes que tu veux afficher.</div>
+    <div class="home-pref-grid">
+      <section>
+        <h4>Actions rapides</h4>
+        <div class="pref-check-list" id="home-action-config-list"></div>
+      </section>
+      <section>
+        <h4>Alertes visibles</h4>
+        <div class="pref-check-list" id="home-alert-config-list"></div>
+      </section>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-out" type="button" onclick="resetHomePreferences()">Réinitialiser</button>
+      <button class="btn-out" type="button" onclick="closeModal('m-home-preferences')">Annuler</button>
+      <button class="btn" type="button" onclick="saveHomePreferences()">Enregistrer</button>
     </div>
   </div>
 </div>
@@ -1165,6 +1182,9 @@
     <div id="ech-reunion-fields" style="display:none">
       <div class="frow">
         <div class="fg"><label>Heure</label><input type="time" id="ech-heure"></div>
+        <div class="fg"><label>Durée</label><input type="number" id="ech-duree" min="15" step="15" placeholder="60"></div>
+      </div>
+      <div class="frow">
         <div class="fg"><label>Lieu / Visio</label><input type="text" id="ech-lieu" placeholder="Adresse, téléphone ou lien visio"></div>
       </div>
       <div class="fg"><label>Inviter des associés</label><div class="invite-box" id="ech-invite-associes"></div></div>
