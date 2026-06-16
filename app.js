@@ -3358,9 +3358,9 @@ function getPendingItems(){
     const t=a.type||'flagged';
     return allowed.has(t) || (t==='alerte'&&allowed.has('flagged'));
   }).map(a=>({type:a.type||'alerte',title:a.title||'Alerte',text:a.text||'',id:a.id,action:()=>openAlertTarget(a)}));
-  const meetings=allowed.has('reunion')?(window.CACHE?.echs||[]).filter(e=>!e.done&&e.type==='reunion'&&new Date(e.date)>=new Date()).sort((a,b)=>new Date(a.date)-new Date(b.date)).map(e=>{
+  const meetings=allowed.has('reunion')?(window.CACHE?.echs||[]).filter(e=>!e.done&&new Date(e.date)>=new Date()&&(e.type==='reunion'||e.heure||e.duree)).sort((a,b)=>new Date(a.date)-new Date(b.date)).map(e=>{
     const details=[fmtDate(e.date), e.heure?'à '+e.heure:'', e.duree?e.duree+' min':''].filter(Boolean).join(' · ');
-    return {type:'reunion',title:'Rendez-vous à venir',text:(e.titre||'Réunion')+' · '+details,action:()=>{closeModal('m-alerts');goPage('echeances');}};
+    return {type:'reunion',title:e.type==='reunion'?'Rendez-vous à venir':'Échéance avec horaire',text:(e.titre||'Échéance')+' · '+details,action:()=>{closeModal('m-alerts');goPage('echeances');}};
   }):[];
   return [...flagged,...decisions,...meetings];
 }
