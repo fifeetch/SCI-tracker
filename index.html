@@ -409,7 +409,7 @@
         <button class="btn-out" onclick="exportComptaCSV()">⬇️ Export CSV</button>
         <button class="btn-out" onclick="exportComptaXLS()">📊 Export Excel</button>
         <button class="btn-out write-only" onclick="document.getElementById('import-ops-input').click()">⬆️ Import CSV</button>
-        <button class="btn-out write-only" onclick="document.getElementById('import-bank-ca-input').click()">🏦 Import Crédit Agricole XLS/XLSX</button>
+        <button class="btn-out write-only" onclick="document.getElementById('import-bank-ca-input').click()">🏦 Import Crédit Agricole CSV/Excel</button>
         <button class="btn-out write-only" onclick="openCreditAgricolePdfModal()">📄 Import relevé PDF CA</button>
         <button class="btn-out write-only" onclick="openBankBalanceModal()">🏦 Solde bancaire</button>
         <button class="btn write-only" onclick="openOpModal(null)">+ Opération</button>
@@ -1301,7 +1301,7 @@
     <p class="small-help">Saisis le solde visible sur le compte Crédit Agricole à une date donnée. L’application estime ensuite le solde actuel avec les opérations enregistrées après cette date.</p>
     <div class="frow">
       <div class="fg"><label>Date du solde</label><input type="date" id="bank-balance-date"></div>
-      <div class="fg"><label>Solde du compte (€)</label><input type="number" step="0.01" id="bank-balance-amount" placeholder="1598.56"></div>
+      <div class="fg"><label>Solde du compte (€)</label><input type="text" inputmode="decimal" id="bank-balance-amount" placeholder="1598,56"></div>
     </div>
     <div class="fg"><label>Note / compte</label><input type="text" id="bank-balance-label-input" placeholder="Compte courant Crédit Agricole"></div>
     <div class="modal-actions">

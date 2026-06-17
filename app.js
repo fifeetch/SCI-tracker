@@ -1675,33 +1675,66 @@ function exportComptaXLS(){
   downloadTextFile('comptabilite-sci-family.xls',html,'application/vnd.ms-excel;charset=utf-8;');
   toast('Export Excel stylé créé ✓');
 }
-function parseCSVLine(line){
-  const out=[]; let cur='', q=false;
-  for(let i=0;i<line.length;i++){
-    const c=line[i];
+function detectCsvDelimiter(text){
+  const sample=String(text||'').slice(0,3000);
+  const semi=(sample.match(/;/g)||[]).length;
+  const comma=(sample.match(/,/g)||[]).length;
+  return semi>=comma ? ';' : ',';
+}
+function parseDelimitedRows(text, delimiter){
+  const s=String(text||'').replace(/^\ufeff/,'');
+  const sep=delimiter || detectCsvDelimiter(s);
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<s.length;i++){
+    const c=s[i];
     if(c==='"'){
-      if(q && line[i+1]==='"'){cur+='"'; i++;}
+      if(q && s[i+1]==='"'){ cur+='"'; i++; }
       else q=!q;
-    }else if((c===';'||c===',') && !q){ out.push(cur.trim()); cur=''; }
-    else cur+=c;
+    }else if(c===sep && !q){
+      row.push(cur.trim()); cur='';
+    }else if((c==='\n' || c==='\r') && !q){
+      if(c==='\r' && s[i+1]==='\n') i++;
+      row.push(cur.trim()); cur='';
+      if(row.some(v=>String(v).trim())) rows.push(row);
+      row=[];
+    }else{
+      cur+=c;
+    }
   }
-  out.push(cur.trim()); return out;
+  row.push(cur.trim());
+  if(row.some(v=>String(v).trim())) rows.push(row);
+  return rows;
+}
+function parseCSVLine(line){
+  return parseDelimitedRows(String(line||''), detectCsvDelimiter(line))[0] || [];
+}
+function normalizeHeaderKey(h){
+  return String(h||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 }
 function parseCSVText(text){
-  const lines=String(text||'').replace(/^\ufeff/,'').split(/\r?\n/).filter(l=>l.trim());
-  if(!lines.length) return [];
-  const headers=parseCSVLine(lines[0]).map(h=>h.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
-  return lines.slice(1).map(line=>{
-    const vals=parseCSVLine(line), obj={};
+  const rows=parseDelimitedRows(text);
+  if(!rows.length) return [];
+  const headers=rows[0].map(normalizeHeaderKey);
+  return rows.slice(1).map(vals=>{
+    const obj={};
     headers.forEach((h,i)=>obj[h]=vals[i]??'');
     return obj;
   });
 }
 function numFR(x){
-  const n=String(x??'').replace(/\s/g,'').replace(',', '.');
+  const n=String(x??'').replace(/\u00a0/g,' ').replace(/[^\d,.\-]/g,'').replace(/\s/g,'').replace(',', '.');
   const v=parseFloat(n); return isNaN(v)?0:v;
 }
-async function readTextFile(file){ return await new Promise((res,rej)=>{const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error); r.readAsText(file,'utf-8');}); }
+async function readTextFile(file){
+  const buffer=await readArrayBufferFile(file);
+  try{
+    const utf8=new TextDecoder('utf-8',{fatal:true}).decode(buffer);
+    return utf8;
+  }catch(e){
+    try{ return new TextDecoder('windows-1252').decode(buffer); }
+    catch(_e){ return new TextDecoder('latin1').decode(buffer); }
+  }
+}
 async function importOpsCSV(event){
   const file=event.target.files?.[0]; event.target.value='';
   if(!file) return; if(!canWrite()){ denyWrite(); return; }
@@ -2115,7 +2148,7 @@ function buildOpsFromCreditAgricoleRows(rows, year){
   const map=headerMap(headers);
   const out=[];
   for(const row of rows.slice(idx+1)){
-    const rawLib=String(row[map.lib]??'').trim();
+    const rawLib=String(row[map.lib]??'').replace(/\r?\n+/g,' ').replace(/\s+/g,' ').trim();
     if(!rawLib) continue;
     const libNorm=normalizeText(rawLib);
     if(/ancien solde|nouveau solde|total des operations|iban|bic/.test(libNorm)) continue;
@@ -2136,9 +2169,7 @@ async function importCreditAgricoleFile(event){
   try{
     let rows=[];
     if(/\.csv$/i.test(file.name)){
-      const parsed=parseCSVText(await readTextFile(file));
-      const headers=Object.keys(parsed[0]||{});
-      rows=[headers,...parsed.map(o=>headers.map(h=>o[h]))];
+      rows=parseDelimitedRows(await readTextFile(file), ';');
     }else{
       if(!window.XLSX) throw new Error('Bibliothèque XLSX non chargée. Vérifie ta connexion internet puis recharge la page.');
       const wb=XLSX.read(await readArrayBufferFile(file),{type:'array',cellDates:true});
@@ -2151,10 +2182,10 @@ async function importCreditAgricoleFile(event){
     const newOps=ops.filter(o=>!keys.has(bankImportKey(o.date,o.lib,o.mt)));
     const ignored=ops.length-newOps.length;
     if(!newOps.length){ toast('Aucune nouvelle opération : doublons ignorés'); return; }
-    if(!confirm(`Importer ${newOps.length} opération(s) Crédit Agricole ?${ignored?`\n${ignored} doublon(s) ignoré(s).`:''}`)) return;
+    if(!confirm(`${ops.length} opération(s) détectée(s).\nImporter ${newOps.length} nouvelle(s) opération(s) Crédit Agricole ?${ignored?`\n${ignored} doublon(s) ignoré(s).`:''}`)) return;
     let count=0;
     for(const o of newOps){
-      await window.dbSet?.('ops',{id:Date.now()+count,date:o.date,lib:o.lib,bien:'',cat:o.cat,type:o.type,payment:'Crédit Agricole',status:o.cat==='À classer'?'a_verifier':'paye',docId:'',mt:o.mt,sourceBank:'credit_agricole',sourceLabel:'Import Crédit Agricole XLS/XLSX',bankImportId:bankImportKey(o.date,o.lib,o.mt),bankBalanceAfter:o.solde});
+      await window.dbSet?.('ops',{id:Date.now()+count,date:o.date,lib:o.lib,bien:'',cat:o.cat,type:o.type,payment:'Crédit Agricole',status:o.cat==='À classer'?'a_verifier':'paye',docId:'',mt:o.mt,sourceBank:'credit_agricole',sourceLabel:'Import Crédit Agricole CSV/XLS/XLSX',bankImportId:bankImportKey(o.date,o.lib,o.mt),bankBalanceAfter:o.solde});
       count++;
     }
     toast(count+' opération(s) Crédit Agricole importée(s) ✓');
@@ -2170,11 +2201,21 @@ function openBankBalanceModal(){
 }
 async function saveBankBalanceRef(){
   if(!canWrite()){ denyWrite(); return; }
-  const date=v('bank-balance-date'), balance=+v('bank-balance-amount');
-  if(!date || isNaN(balance)){ toast('Renseigne une date et un solde valide.'); return; }
+  const date=v('bank-balance-date'), rawBalance=v('bank-balance-amount'), balance=numFR(rawBalance);
+  if(!date || !String(rawBalance||'').trim() || isNaN(balance)){ toast('Renseigne une date et un solde valide.'); return; }
   const obj={id:'bankBalance',date,balance,label:v('bank-balance-label-input')||'Compte courant Crédit Agricole',updatedAt:new Date().toISOString()};
   const ok=await saveWithFeedback(window.dbSet?.('settings',obj),'Solde bancaire enregistré ✓');
-  if(ok){ closeModal('m-bank-balance'); renderCompta(); }
+  if(ok){
+    const settings=window.CACHE?.settings;
+    if(Array.isArray(settings)){
+      const idx=settings.findIndex(x=>String(x.id)==='bankBalance');
+      if(idx>=0) settings[idx]={...settings[idx],...obj};
+      else settings.push(obj);
+    }
+    closeModal('m-bank-balance');
+    renderCompta();
+    try{ renderHome(); }catch(e){}
+  }
 }
 
 // ══ IMPORT PDF CRÉDIT AGRICOLE V2.1 INTÉGRÉ ══
