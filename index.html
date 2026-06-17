@@ -452,8 +452,13 @@
       <div class="budget-kpi"><span>Résultat prévu</span><strong id="bp-net">—</strong></div>
       <div class="budget-kpi"><span>Écart réel / prévu</span><strong id="bp-ecart">—</strong></div>
     </div>
+      <div class="budget-dashboard-grid">
+        <div class="budget-chart-card" id="budget-vs-real-chart"></div>
+        <div class="budget-chart-card" id="budget-category-chart"></div>
+        <div class="budget-chart-card" id="budget-gap-chart"></div>
+      </div>
       <div class="table-wrap">
-        <table class="budget-table-mini"><thead><tr><th>Type</th><th>Poste</th><th>Catégorie</th><th>Montant prévu</th><th>Réel</th><th>Écart</th><th></th></tr></thead><tbody id="budget-table"></tbody></table>
+        <table class="budget-table-mini"><thead><tr><th>Type</th><th>Poste</th><th>Catégorie</th><th>Saisie</th><th>Annuel prévu</th><th>Réel</th><th>Écart</th><th></th></tr></thead><tbody id="budget-table"></tbody></table>
       </div>
     </div>
   </div>
@@ -1287,7 +1292,11 @@
     <div class="fg"><label>Poste budgétaire</label><input type="text" id="budget-lib" placeholder="Loyers annuels, taxe foncière, travaux..."></div>
     <div class="frow">
       <div class="fg"><label>Catégorie</label><select id="budget-cat"><option>Loyer</option><option>Charges locatives</option><option>Taxe foncière</option><option>Assurance</option><option>Travaux</option><option>Honoraires</option><option>Banque</option><option>Emprunt</option><option>Autre</option></select></div>
-      <div class="fg"><label>Montant annuel prévu (€)</label><input type="number" id="budget-mt" placeholder="1200"></div>
+      <div class="fg"><label>Montant saisi (€)</label><input type="number" id="budget-mt" placeholder="1200" oninput="updateBudgetAnnualPreview()"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Périodicité</label><select id="budget-period" onchange="updateBudgetAnnualPreview()"><option value="annual">Annuel</option><option value="monthly">Mensuel</option><option value="quarterly">Trimestriel</option><option value="semiannual">Semestriel</option><option value="once">Ponctuel</option></select></div>
+      <div class="fg"><label>Montant annuel calculé</label><input type="text" id="budget-annual-preview" readonly placeholder="—"></div>
     </div>
     <div class="fg"><label>Notes</label><textarea id="budget-notes" rows="2" placeholder="Hypothèse, devis prévu, échéance..."></textarea></div>
     <div class="modal-actions">

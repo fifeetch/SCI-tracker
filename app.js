@@ -1776,8 +1776,11 @@ async function importOpsCSV(event){
 }
 function exportBudgetCSV(){
   const budgets=window.CACHE?.budgets||[];
-  const header=['Annee','Type','Poste','Categorie','Montant','Notes'];
-  const rows=budgets.map(b=>[b.year||'',b.type||'',b.lib||'',b.cat||'',String(b.mt||0).replace('.',','),b.notes||'']);
+  const header=['Annee','Type','Poste','Categorie','Montant saisi','Periodicite','Montant annuel','Notes'];
+  const rows=budgets.map(b=>{
+    const base=b.baseMt!=null?+b.baseMt:+b.mt||0;
+    return [b.year||'',b.type||'',b.lib||'',b.cat||'',String(base).replace('.',','),b.period||'annual',String(budgetAnnualAmount(b)).replace('.',','),b.notes||''];
+  });
   const csv=[header,...rows].map(r=>r.map(csvEscape).join(';')).join('\n');
   downloadTextFile('budget-previsionnel-sci-family.csv',csv);
   toast('Export budget créé ✓');
@@ -1792,7 +1795,9 @@ async function importBudgetCSV(event){
     let count=0;
     for(const r of rows){
       const type=(r.type||'charge').toLowerCase().includes('recette')?'recette':'charge';
-      await window.dbSet?.('budgets',{id:Date.now()+count,year:+(r.annee||r['année']||new Date().getFullYear()),type,lib:r.poste||r.libelle||r['libellé']||'',cat:r.categorie||r['catégorie']||'Autre',mt:numFR(r.montant),notes:r.notes||''});
+      const period=r.periodicite||r['périodicité']||r.period||'annual';
+      const baseMt=numFR(r['montant saisi']||r.montant||r['montant annuel']);
+      await window.dbSet?.('budgets',{id:Date.now()+count,year:+(r.annee||r['année']||new Date().getFullYear()),type,lib:r.poste||r.libelle||r['libellé']||'',cat:r.categorie||r['catégorie']||'Autre',baseMt,period,mt:baseMt*budgetPeriodFactor(period),notes:r.notes||''});
       count++;
     }
     toast(count+' ligne(s) de budget importée(s) ✓');
@@ -1820,12 +1825,59 @@ function calcActualByCat(year, cat, type){
     return type==='recette' ? (+o.mt||0)>0 : (+o.mt||0)<0;
   }).reduce((s,o)=>s+Math.abs(+o.mt||0),0);
 }
+function budgetPeriodFactor(period){
+  return ({annual:1,monthly:12,quarterly:4,semiannual:2,once:1})[period||'annual'] || 1;
+}
+function budgetPeriodLabel(period){
+  return ({annual:'Annuel',monthly:'Mensuel',quarterly:'Trimestriel',semiannual:'Semestriel',once:'Ponctuel'})[period||'annual'] || 'Annuel';
+}
+function budgetAnnualAmount(b){
+  if(b.baseMt!=null || b.period) return (+b.baseMt||0)*budgetPeriodFactor(b.period);
+  return +b.mt||0;
+}
+function updateBudgetAnnualPreview(){
+  const el=$('budget-annual-preview'); if(!el) return;
+  const annual=(+v('budget-mt')||0)*budgetPeriodFactor(v('budget-period')||'annual');
+  el.value=annual?annual.toLocaleString('fr-FR')+' €':'—';
+}
+function budgetRowsWithActual(year){
+  return (window.CACHE?.budgets||[]).filter(b=>+b.year===+year).map(b=>{
+    const planned=budgetAnnualAmount(b);
+    const real=calcActualByCat(year,b.cat,b.type);
+    const ecart=b.type==='recette' ? real-planned : planned-real;
+    return {...b,planned,real,ecart};
+  });
+}
+function renderBudgetVsRealChart(rows, realRec, realChg){
+  const box=$('budget-vs-real-chart'); if(!box) return;
+  const plannedRec=rows.filter(b=>b.type==='recette').reduce((s,b)=>s+b.planned,0);
+  const plannedChg=rows.filter(b=>b.type==='charge').reduce((s,b)=>s+b.planned,0);
+  const max=Math.max(1,plannedRec,plannedChg,realRec,realChg);
+  box.innerHTML=`<h4>Prévu vs réel</h4><div class="budget-vs-grid">
+    <div class="budget-vs-row"><span>Recettes prév.</span><div class="budget-vs-bar"><i style="--w:${Math.round(plannedRec/max*100)}%"></i></div><strong>${financeShortMoney(plannedRec)}</strong></div>
+    <div class="budget-vs-row"><span>Recettes réel</span><div class="budget-vs-bar"><i style="--w:${Math.round(realRec/max*100)}%;background:var(--blue)"></i></div><strong>${financeShortMoney(realRec)}</strong></div>
+    <div class="budget-vs-row charge"><span>Charges prév.</span><div class="budget-vs-bar"><i style="--w:${Math.round(plannedChg/max*100)}%"></i></div><strong>${financeShortMoney(plannedChg)}</strong></div>
+    <div class="budget-vs-row charge"><span>Charges réel</span><div class="budget-vs-bar"><i style="--w:${Math.round(realChg/max*100)}%;background:var(--gold)"></i></div><strong>${financeShortMoney(realChg)}</strong></div>
+  </div>`;
+}
+function renderBudgetCategoryChart(rows){
+  const box=$('budget-category-chart'); if(!box) return;
+  const entries=[...rows.reduce((m,b)=>m.set(b.cat||'Autre',(m.get(b.cat||'Autre')||0)+b.planned),new Map()).entries()].sort((a,b)=>b[1]-a[1]);
+  box.innerHTML=entries.length?renderHBarChart('Budget par catégorie',entries):'<h4>Budget par catégorie</h4><div class="budget-chart-empty">Ajoute une ligne de budget.</div>';
+}
+function renderBudgetGapChart(rows){
+  const box=$('budget-gap-chart'); if(!box) return;
+  const entries=rows.map(b=>[b.cat||b.lib||'Budget',Math.abs(b.ecart),b.ecart]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(!entries.length){ box.innerHTML='<h4>Top écarts</h4><div class="budget-chart-empty">Aucun écart significatif.</div>'; return; }
+  const max=Math.max(1,...entries.map(x=>x[1]));
+  box.innerHTML=`<h4>Top écarts</h4><div class="finance-hbar-list">${entries.map(x=>`<div class="finance-hbar-row"><span>${esc(x[0])}</span><div class="finance-hbar"><i style="--w:${Math.round(x[1]/max*100)}%;background:${x[2]>=0?'var(--green)':'var(--red)'}"></i></div><strong>${x[2]>=0?'+':'-'}${financeShortMoney(x[1])}</strong></div>`).join('')}</div>`;
+}
 function renderBudget(){
   fillBudgetYears();
   const year=selectedBudgetYear();
-  const rows=(window.CACHE?.budgets||[]).filter(b=>+b.year===+year);
-  const rec=rows.filter(b=>b.type==='recette').reduce((s,b)=>s+(+b.mt||0),0);
-  const chg=rows.filter(b=>b.type==='charge').reduce((s,b)=>s+(+b.mt||0),0);
+  const rows=budgetRowsWithActual(year);
+  const rec=rows.filter(b=>b.type==='recette').reduce((s,b)=>s+b.planned,0);
+  const chg=rows.filter(b=>b.type==='charge').reduce((s,b)=>s+b.planned,0);
   const realRec=(window.CACHE?.ops||[]).filter(o=>new Date(o.date).getFullYear()===+year && (+o.mt||0)>0).reduce((s,o)=>s+(+o.mt||0),0);
   const realChg=(window.CACHE?.ops||[]).filter(o=>new Date(o.date).getFullYear()===+year && (+o.mt||0)<0).reduce((s,o)=>s+Math.abs(+o.mt||0),0);
   const set=(id,val)=>{const el=$(id);if(el)el.textContent=val;};
@@ -1833,13 +1885,15 @@ function renderBudget(){
   set('bp-chg',chg.toLocaleString('fr-FR')+' €');
   set('bp-net',(rec-chg).toLocaleString('fr-FR')+' €');
   set('bp-ecart',((realRec-realChg)-(rec-chg)).toLocaleString('fr-FR')+' €');
+  renderBudgetVsRealChart(rows,realRec,realChg);
+  renderBudgetCategoryChart(rows);
+  renderBudgetGapChart(rows);
   const bc=$('budget-count'); if(bc) bc.textContent=rows.length+' ligne'+(rows.length>1?'s':'');
   const tb=$('budget-table'); if(!tb) return;
   tb.innerHTML=rows.length?rows.sort((a,b)=>String(a.type).localeCompare(String(b.type))||String(a.cat).localeCompare(String(b.cat))).map(b=>{
-    const real=calcActualByCat(year,b.cat,b.type);
-    const ecart=b.type==='recette' ? real-(+b.mt||0) : (+b.mt||0)-real;
-    return `<tr><td><span class="tag ${b.type==='recette'?'tg':'tr'}">${b.type==='recette'?'Recette':'Charge'}</span></td><td>${esc(b.lib||'—')}</td><td>${esc(b.cat||'Autre')}</td><td>${(+b.mt||0).toLocaleString('fr-FR')} €</td><td>${real.toLocaleString('fr-FR')} €</td><td class="${ecart>=0?'apos':'aneg'}">${ecart.toLocaleString('fr-FR')} €</td><td><button class="ico-btn write-only" onclick="openBudgetModal('${String(b.id)}')">✏️</button></td></tr>`;
-  }).join(''):'<tr><td colspan="7" style="color:var(--text2);text-align:center;padding:18px">Aucun budget prévisionnel pour cette année. Ajoute une première ligne.</td></tr>';
+    const base=b.baseMt!=null?+b.baseMt:+b.mt||0;
+    return `<tr><td><span class="tag ${b.type==='recette'?'tg':'tr'}">${b.type==='recette'?'Recette':'Charge'}</span></td><td>${esc(b.lib||'—')}</td><td>${esc(b.cat||'Autre')}</td><td>${base.toLocaleString('fr-FR')} €<br><span class="budget-period-chip">${esc(budgetPeriodLabel(b.period))}</span></td><td>${b.planned.toLocaleString('fr-FR')} €</td><td>${b.real.toLocaleString('fr-FR')} €</td><td class="${b.ecart>=0?'apos':'aneg'}">${b.ecart.toLocaleString('fr-FR')} €</td><td><button class="ico-btn write-only" onclick="openBudgetModal('${String(b.id)}')">✏️</button></td></tr>`;
+  }).join(''):'<tr><td colspan="8" style="color:var(--text2);text-align:center;padding:18px">Aucun budget prévisionnel pour cette année. Ajoute une première ligne.</td></tr>';
 }
 function openBudgetModal(id){
   if(!canWrite()){ denyWrite(); return; }
@@ -1851,14 +1905,17 @@ function openBudgetModal(id){
   sv('budget-type',b?.type||'charge');
   sv('budget-lib',b?.lib||'');
   sv('budget-cat',b?.cat||'Autre');
-  sv('budget-mt',b?.mt||'');
+  sv('budget-mt',b?.baseMt ?? b?.mt ?? '');
+  sv('budget-period',b?.period||'annual');
   sv('budget-notes',b?.notes||'');
+  updateBudgetAnnualPreview();
   openModal('m-budget');
 }
 async function saveBudgetLine(){
   if(!canWrite()){ denyWrite(); return; }
   const id=v('budget-id'), e=!!id;
-  const obj={id:e?id:Date.now(),year:+v('budget-year-inp')||new Date().getFullYear(),type:v('budget-type'),lib:v('budget-lib'),cat:v('budget-cat'),mt:+v('budget-mt')||0,notes:v('budget-notes')};
+  const baseMt=+v('budget-mt')||0, period=v('budget-period')||'annual';
+  const obj={id:e?id:Date.now(),year:+v('budget-year-inp')||new Date().getFullYear(),type:v('budget-type'),lib:v('budget-lib'),cat:v('budget-cat'),baseMt,period,mt:baseMt*budgetPeriodFactor(period),notes:v('budget-notes')};
   const ok=await saveWithFeedback(window.dbSet?.('budgets',obj), e?'Budget mis à jour ✓':'Ligne budget ajoutée ✓');
   if(ok) closeModal('m-budget');
 }

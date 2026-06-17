@@ -234,9 +234,12 @@
   .finance-status-stack i.bank{background:var(--blue);}
   .finance-status-stack i.missing{background:var(--red);}
   .finance-status-stack i.verify{background:var(--gold);}
-  .finance-dashboard.compact .finance-chart-side{display:none;}
-  .finance-dashboard.compact .finance-chart-layout{grid-template-columns:1fr;}
+  .finance-dashboard.compact .finance-chart-layout{grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);}
+  .finance-dashboard.compact .finance-chart-side{display:grid;}
   .finance-dashboard.compact .finance-chart-main{min-height:220px;}
+  .finance-dashboard:not(.compact) .finance-chart-layout{grid-template-columns:1fr;}
+  .finance-dashboard:not(.compact) .finance-chart-side{grid-template-columns:1fr 1fr;}
+  .finance-dashboard:not(.compact) .finance-chart-main{min-height:300px;}
   .finance-config-modal{max-width:720px;}
   .finance-config-section{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px;margin:12px 0;}
   .finance-config-section h4{font-size:13px;margin:0 0 10px;color:var(--text);}
@@ -256,7 +259,7 @@
   .finance-list-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--text2);}
   .finance-list-row strong{color:var(--text);}
   @media(max-width:860px){.finance-chart-layout{grid-template-columns:1fr}.finance-chart-side{grid-template-columns:1fr 1fr}.finance-donut-row{grid-template-columns:1fr}.finance-donut{margin:auto}}
-  @media(max-width:760px){.finance-split{grid-template-columns:1fr}.finance-bar-row{grid-template-columns:1fr}.finance-bar-row span:last-child{text-align:left!important}.finance-chart-side{grid-template-columns:1fr}.finance-hbar-row{grid-template-columns:1fr}.finance-hbar-row strong{text-align:left}.finance-dashboard-actions{justify-content:flex-start}.finance-dashboard-actions .btn-sm{flex:1}}
+  @media(max-width:760px){.finance-split{grid-template-columns:1fr}.finance-bar-row{grid-template-columns:1fr}.finance-bar-row span:last-child{text-align:left!important}.finance-dashboard.compact .finance-chart-layout{grid-template-columns:1fr}.finance-chart-side{grid-template-columns:1fr}.finance-hbar-row{grid-template-columns:1fr}.finance-hbar-row strong{text-align:left}.finance-dashboard-actions{justify-content:flex-start}.finance-dashboard-actions .btn-sm{flex:1}}
 
   /* ── BUDGET PRÉVISIONNEL V1.6 ── */
   .budget-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin:22px 0;box-shadow:var(--shadow);}
@@ -291,9 +294,21 @@
   .budget-kpi{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px;}
   .budget-kpi strong{display:block;font-family:'Playfair Display',serif;font-size:20px;color:var(--gold);margin-top:4px;}
   .budget-kpi span{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;}
+  .budget-dashboard-grid{display:grid;grid-template-columns:1.15fr .85fr .85fr;gap:12px;margin:0 0 14px;}
+  .budget-chart-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px;min-height:154px;overflow:hidden;}
+  .budget-chart-card h4{font-size:13px;margin:0 0 10px;color:var(--text);}
+  .budget-chart-empty{border:1px dashed var(--border);border-radius:12px;min-height:96px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text2);font-size:12px;padding:12px;background:rgba(255,255,255,.35);}
+  .budget-vs-grid{display:grid;gap:10px;}
+  .budget-vs-row{display:grid;grid-template-columns:92px 1fr 78px;gap:9px;align-items:center;font-size:11px;color:var(--text2);}
+  .budget-vs-bar{height:12px;border-radius:999px;background:var(--border);overflow:hidden;}
+  .budget-vs-bar i{display:block;height:100%;border-radius:999px;width:var(--w,0%);background:var(--green);}
+  .budget-vs-row.charge i{background:var(--red);}
+  .budget-vs-row strong{text-align:right;color:var(--text);white-space:nowrap;font-size:11px;}
+  .budget-table-mini .budget-period-chip{display:inline-flex;border-radius:999px;padding:3px 7px;background:var(--surface2);border:1px solid var(--border);font-size:10px;color:var(--text2);font-weight:800;margin-top:4px;}
   .budget-table-mini{width:100%;border-collapse:collapse;margin-top:8px;}
   .budget-table-mini th,.budget-table-mini td{padding:10px 8px;border-top:1px solid var(--border);font-size:12px;}
   .budget-table-mini th{color:var(--text2);text-transform:uppercase;letter-spacing:.8px;font-size:10px;background:var(--surface2);}
+  @media(max-width:900px){.budget-dashboard-grid{grid-template-columns:1fr}.budget-vs-row{grid-template-columns:1fr}.budget-vs-row strong{text-align:left}}
 
 
   /* ── PRÉPARATION COMPTABLE V1.1 ── */
