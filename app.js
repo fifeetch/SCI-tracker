@@ -1940,10 +1940,10 @@ function accountingRules(){
   const saved=accountingRulesRef()?.rules;
   return Array.isArray(saved) && saved.length ? saved : defaultAccountingRules();
 }
-function applyAccountingRulesToOp(op){
+function applyAccountingRulesToOp(op, rules=accountingRules()){
   const source={...op};
   const text=normalizeText([source.lib, source.sourceLabel, source.payment].join(' '));
-  const rule=accountingRules().find(r=>r && r.enabled!==false && normalizeText(r.pattern) && text.includes(normalizeText(r.pattern)));
+  const rule=rules.find(r=>r && r.enabled!==false && normalizeText(r.pattern) && text.includes(normalizeText(r.pattern)));
   if(!rule) return source;
   const noDoc=!!rule.noDocRequired;
   return {
@@ -1988,10 +1988,9 @@ function accountingRuleCategoryOptions(selected){
   const cats=isGFAContext()?['Fermage','Taxe foncière','MSA / charges agricoles','Entretien foncier','Travaux ruraux','Assurance','Frais notaire / SAFER','Honoraires','Autre GFA','À classer']:['Loyer','Charges de copropriété','Charges locatives','Taxe foncière','Assurance','Travaux','Honoraires','Banque','Autre','À classer'];
   return cats.map(c=>`<option ${String(c)===String(selected)?'selected':''}>${esc(c)}</option>`).join('');
 }
-async function saveAccountingRulesFromModal(){
-  if(!canWrite()){ denyWrite(); return; }
+function collectAccountingRulesFromModal(){
   const cards=[...document.querySelectorAll('#accounting-rules-list .rule-card')];
-  const rules=cards.map(card=>{
+  return cards.map(card=>{
     const get=f=>card.querySelector(`[data-rule-field="${f}"]`);
     return {
       id:card.dataset.ruleId || ('rule-'+Date.now()),
@@ -2003,17 +2002,47 @@ async function saveAccountingRulesFromModal(){
       payment:get('payment')?.value.trim() || ''
     };
   }).filter(r=>r.pattern);
+}
+function syncAccountingRulesCache(obj){
+  const settings=window.CACHE?.settings;
+  if(Array.isArray(settings)){
+    const idx=settings.findIndex(x=>String(x.id)==='accountingRules');
+    if(idx>=0) settings[idx]={...settings[idx],...obj};
+    else settings.push(obj);
+  }
+}
+async function saveAccountingRulesFromModal(){
+  if(!canWrite()){ denyWrite(); return; }
+  const rules=collectAccountingRulesFromModal();
   const obj={id:'accountingRules',rules,updatedAt:new Date().toISOString()};
   const ok=await saveWithFeedback(window.dbSet?.('settings',obj),'Règles automatiques enregistrées ✓');
   if(ok){
-    const settings=window.CACHE?.settings;
-    if(Array.isArray(settings)){
-      const idx=settings.findIndex(x=>String(x.id)==='accountingRules');
-      if(idx>=0) settings[idx]={...settings[idx],...obj};
-      else settings.push(obj);
-    }
+    syncAccountingRulesCache(obj);
     closeModal('m-accounting-rules');
   }
+}
+function accountingRuleChangedOp(before, after){
+  return ['cat','status','payment','bien','docId','noDocRequired','justificatifNotRequired','noDocReason'].some(k=>String(before?.[k]??'')!==String(after?.[k]??''));
+}
+async function applyAccountingRulesToExistingOps(){
+  if(!canWrite()){ denyWrite(); return; }
+  const rules=collectAccountingRulesFromModal();
+  const obj={id:'accountingRules',rules,updatedAt:new Date().toISOString()};
+  const ops=window.CACHE?.ops||[];
+  const updated=ops.map(op=>applyAccountingRulesToOp(op,rules)).filter((op,i)=>accountingRuleChangedOp(ops[i],op));
+  if(!updated.length){ toast('Aucune opération existante à modifier'); return; }
+  if(!confirm(`Appliquer les règles à ${updated.length} opération(s) existante(s) ?`)) return;
+  const ok=await saveWithFeedback(window.dbSet?.('settings',obj),'Règles automatiques enregistrées ✓');
+  if(!ok) return;
+  syncAccountingRulesCache(obj);
+  let count=0;
+  for(const op of updated){
+    await window.dbSet?.('ops',op);
+    count++;
+  }
+  toast(count+' opération(s) mise(s) à jour par les règles ✓');
+  closeModal('m-accounting-rules');
+  renderCompta();
 }
 function currentJournalFilters(){
   return {
