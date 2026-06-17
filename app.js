@@ -16,6 +16,12 @@ const db   = firebase.firestore();
 // V1.0.7 : aucun cache persistant Firestore. On force les lectures serveur au démarrage.
 db.enableNetwork().catch(()=>{}); // forcer connexion réseau
 const storage = firebase.storage();
+let messaging = null;
+try{
+  messaging = firebase.messaging ? firebase.messaging() : null;
+}catch(err){
+  console.warn('Firebase Messaging indisponible', err);
+}
 
 
 // V1.0.7 : reset local agressif si URL ?resetLocal=1
@@ -56,7 +62,7 @@ window.emergencyLocalReset = emergencyLocalReset;
 let SCI_ID  = 'default';
 // V1.1.2 : on ne décide plus la SCI active depuis le localStorage.
 // La vraie source est Firestore users/{uid}.activeSci, chargée dans loadUserRole().
-const CACHE   = {biens:[],locataires:[],associes:[],ops:[],budgets:[],docs:[],echs:[],messages:[],decisions:[],pvs:[],pouvoirs:[],baux:[],activity:[],alerts:[],settings:[]};
+const CACHE   = {biens:[],locataires:[],associes:[],ops:[],budgets:[],docs:[],echs:[],messages:[],decisions:[],pvs:[],pouvoirs:[],baux:[],activity:[],alerts:[],settings:[],pushTokens:[]};
 const APP_STATE = { role:'associe', profile:null, scis:[], currentSCI:null };
 const _unsubs = [];
 function isGerant(){ return APP_STATE.role === 'gerant'; }
@@ -150,7 +156,7 @@ window.resetSCIData = async function(){
   const ok = confirm('Vider toutes les données de la structure active ? Biens, locataires, associés, opérations, documents, échéances, messages et décisions seront supprimés. Cette action est définitive.');
   if(!ok) return;
   try{
-    await Promise.all(['biens','locataires','associes','ops','budgets','docs','echs','messages','decisions','pvs','pouvoirs','baux','activity','alerts','settings'].map(deleteCollectionDocs));
+    await Promise.all(['biens','locataires','associes','ops','budgets','docs','echs','messages','decisions','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'].map(deleteCollectionDocs));
     window.SCIapp?.toast('Structure vidée ✓');
     window.SCIapp?.onData?.('reset');
   }catch(err){
@@ -166,7 +172,7 @@ async function startListeners(){
   try{ await firebase.auth().currentUser?.getIdToken(true); }catch(e){ console.warn('[SCI] token refresh', e); }
 
   const ACTIVE_SCI = SCI_ID;
-  const COLS = ['biens','locataires','associes','ops','budgets','docs','echs','messages','pvs','pouvoirs','baux','activity','alerts','settings'];
+  const COLS = ['biens','locataires','associes','ops','budgets','docs','echs','messages','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'];
 
   async function loadColFromServer(col){
     const snap = colRef(col).get ? await colRef(col).get({source:'server'}) : null;
@@ -957,6 +963,7 @@ function renderParametres(){
   renderStorageUsage();
   renderSCISwitcher();
   renderFirebaseDiagnostics();
+  updatePushNotificationSettingsUI();
   selectSettingsSection(window.__activeSettingsSection || 'account');
 }
 
@@ -965,6 +972,7 @@ function selectSettingsSection(section){
     account:['Mon compte','Profil et apparence','Informations personnelles, photo de profil et thème de l’application.'],
     backup:['Sauvegardes','Données et exports','Stockage documents, sauvegarde complète, Excel, ZIP et exports CSV.'],
     access:['Sécurité & accès','Droits utilisateurs','Rappel des permissions entre gérants et associés.'],
+    notifications:['Notifications','Téléphone et alertes','Activer les notifications de messages et rendez-vous sur les téléphones des gérants.'],
     firebase:['Firebase','Diagnostic technique','Projet, structure active, chemin des données et cache local.'],
     danger:['Zone danger','Actions sensibles','Opérations irréversibles à utiliser uniquement en connaissance de cause.']
   };
@@ -981,6 +989,152 @@ function selectSettingsSection(section){
   if(e) e.textContent=eyebrow;
   if(t) t.textContent=title;
   if(s) s.textContent=subtitle;
+}
+
+function pushConfig(){
+  return (window.CACHE?.settings||[]).find(x=>String(x.id)==='pushConfig') || null;
+}
+function pushTokenDocId(token){
+  const uid=auth.currentUser?.uid || 'device';
+  const suffix=String(token||'').slice(-24).replace(/[^a-zA-Z0-9]/g,'');
+  return `${uid}_${suffix || Date.now()}`;
+}
+function pushSupported(){
+  return !!(window.isSecureContext && 'Notification' in window && 'serviceWorker' in navigator && messaging);
+}
+async function activeServiceWorkerRegistration(){
+  if(!('serviceWorker' in navigator)) return null;
+  return navigator.serviceWorker.register('/firebase-messaging-sw.js');
+}
+async function currentPushToken(){
+  if(!pushSupported()) return '';
+  const cfg=pushConfig();
+  const vapidKey=String(cfg?.vapidKey||'').trim();
+  if(!vapidKey) return '';
+  try{
+    const serviceWorkerRegistration=await activeServiceWorkerRegistration();
+    return await messaging.getToken({vapidKey, serviceWorkerRegistration});
+  }catch(err){
+    console.warn('Token push indisponible', err);
+    return '';
+  }
+}
+function updatePushNotificationSettingsUI(){
+  const set=(id,val)=>{const el=$(id); if(el) el.textContent=val;};
+  const input=$('push-vapid-key');
+  const cfg=pushConfig();
+  if(input && document.activeElement!==input) input.value=cfg?.vapidKey || '';
+  const permission=('Notification' in window) ? Notification.permission : 'non supporte';
+  set('push-permission-status', permission==='granted'?'Autorise':permission==='denied'?'Bloque':permission==='default'?'A demander':permission);
+  set('push-support-status', pushSupported()?'Compatible':'Non compatible sur ce navigateur');
+  const uid=auth.currentUser?.uid || '';
+  const tokens=(window.CACHE?.pushTokens||[]).filter(t=>String(t.uid||'')===uid && t.enabled!==false);
+  set('push-device-status', tokens.length ? `${tokens.length} appareil(s)` : 'Non active');
+}
+async function savePushConfig(){
+  if(!canWrite()){ denyWrite(); return; }
+  const vapidKey=String($('push-vapid-key')?.value||'').trim();
+  if(!vapidKey){ toast('Ajoute la cle VAPID Firebase avant enregistrement.'); return; }
+  const obj={id:'pushConfig', vapidKey, updatedAt:new Date().toISOString()};
+  try{
+    await dbSet('settings', obj);
+    const settings=window.CACHE?.settings;
+    if(Array.isArray(settings)){
+      const idx=settings.findIndex(x=>String(x.id)==='pushConfig');
+      if(idx>=0) settings[idx]={...settings[idx],...obj};
+      else settings.push(obj);
+    }
+    updatePushNotificationSettingsUI();
+    toast('Cle notifications enregistree ✓');
+  }catch(err){ console.error(err); toast(formatFirebaseError(err)); }
+}
+async function enablePushNotifications(){
+  if(!canWrite()){ denyWrite(); return; }
+  if(!pushSupported()){
+    toast('Notifications non supportees sur ce navigateur.');
+    updatePushNotificationSettingsUI();
+    return;
+  }
+  const cfg=pushConfig();
+  if(!String(cfg?.vapidKey||'').trim()){
+    toast('Enregistre d abord la cle publique VAPID Firebase.');
+    selectSettingsSection('notifications');
+    return;
+  }
+  try{
+    const permission=await Notification.requestPermission();
+    if(permission!=='granted'){
+      updatePushNotificationSettingsUI();
+      toast('Autorisation notification refusee ou en attente.');
+      return;
+    }
+    const serviceWorkerRegistration=await activeServiceWorkerRegistration();
+    const token=await messaging.getToken({vapidKey:String(cfg.vapidKey).trim(), serviceWorkerRegistration});
+    if(!token) throw new Error('Token Firebase Messaging vide');
+    const id=pushTokenDocId(token);
+    const payload={
+      id,
+      uid:auth.currentUser?.uid||'',
+      email:auth.currentUser?.email||'',
+      role:APP_STATE.role,
+      token,
+      enabled:true,
+      platform:navigator.platform||'',
+      userAgent:navigator.userAgent||'',
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await colRef('pushTokens').doc(id).set(payload,{merge:true});
+    if(!Array.isArray(window.CACHE.pushTokens)) window.CACHE.pushTokens=[];
+    const idx=window.CACHE.pushTokens.findIndex(x=>String(x.id)===id);
+    const localPayload={...payload, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()};
+    if(idx>=0) window.CACHE.pushTokens[idx]=localPayload;
+    else window.CACHE.pushTokens.push(localPayload);
+    updatePushNotificationSettingsUI();
+    toast('Notifications activees sur cet appareil ✓');
+  }catch(err){
+    console.error('Activation push impossible', err);
+    toast(formatFirebaseError(err));
+  }
+}
+async function disablePushNotifications(){
+  if(!canWrite()){ denyWrite(); return; }
+  try{
+    const token=await currentPushToken();
+    if(messaging && token) await messaging.deleteToken(token).catch(()=>{});
+    if(token){
+      const id=pushTokenDocId(token);
+      await colRef('pushTokens').doc(id).set({enabled:false, disabledAt:firebase.firestore.FieldValue.serverTimestamp(), updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+      if(Array.isArray(window.CACHE.pushTokens)){
+        window.CACHE.pushTokens=window.CACHE.pushTokens.map(t=>String(t.id)===id?{...t,enabled:false}:t);
+      }
+    }
+    updatePushNotificationSettingsUI();
+    toast('Notifications desactivees sur cet appareil.');
+  }catch(err){ console.error(err); toast(formatFirebaseError(err)); }
+}
+async function testLocalNotification(){
+  if(!pushSupported()){ toast('Notifications non supportees sur ce navigateur.'); return; }
+  const permission=Notification.permission==='granted' ? 'granted' : await Notification.requestPermission();
+  if(permission!=='granted'){ toast('Autorisation notification non accordee.'); return; }
+  const title='SCI Family';
+  const options={body:'Test notification : messages et rendez-vous pourront arriver ici.', icon:'/icons/icon.svg', badge:'/icons/icon.svg'};
+  try{
+    const reg=await activeServiceWorkerRegistration();
+    await reg.showNotification(title, options);
+  }catch(err){
+    new Notification(title, options);
+  }
+  updatePushNotificationSettingsUI();
+}
+if(messaging){
+  try{
+    messaging.onMessage(payload=>{
+      const title=payload?.notification?.title || payload?.data?.title || 'SCI Family';
+      const body=payload?.notification?.body || payload?.data?.body || 'Nouvelle notification';
+      toast(`${title} - ${body}`);
+    });
+  }catch(err){ console.warn('Ecoute foreground push impossible', err); }
 }
 
 function renderGFA(){

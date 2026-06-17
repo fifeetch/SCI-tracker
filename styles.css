@@ -819,7 +819,7 @@
 
   /* Paramètres : exports plus visibles */
   .settings-export-card{border-color:rgba(31,157,133,.22)!important;}
-  .settings-hub{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin:6px 0 18px;}
+  .settings-hub{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:6px 0 18px;}
   .settings-tile{min-height:138px;text-align:left;border:1px solid var(--border);background:rgba(255,255,255,.84);color:var(--text);border-radius:20px;padding:16px;cursor:pointer;font-family:'DM Sans',sans-serif;display:grid;grid-template-rows:auto auto 1fr auto;gap:6px;box-shadow:0 10px 28px rgba(11,36,77,.06);transition:.2s;}
   .settings-tile:hover{transform:translateY(-2px);border-color:var(--v2-mint);box-shadow:0 16px 34px rgba(11,36,77,.10);}
   .settings-tile.active{border-color:rgba(31,157,133,.42);background:linear-gradient(135deg,rgba(31,157,133,.14),rgba(47,110,203,.08));}
@@ -855,6 +855,7 @@
   .settings-info-list span{color:var(--text2);font-weight:700;}
   .settings-info-list strong{color:var(--text);text-align:right;word-break:break-word;}
   .settings-firebase-card{border-color:rgba(47,110,203,.22)!important;}
+  .settings-notification-card{border-color:rgba(31,157,133,.24)!important;}
   @media(max-width:1100px){.settings-hub{grid-template-columns:repeat(2,minmax(0,1fr));}.settings-tile{min-height:118px;}}
   @media(max-width:900px){.settings-export-actions{grid-template-columns:1fr}.settings-export-action{min-height:auto}.settings-export-csv{grid-template-columns:1fr}.settings-export-csv .btn-out{width:100%;}}
   @media(max-width:640px){.settings-hub{grid-template-columns:1fr}.settings-tile{min-height:auto}.settings-detail-head{padding:16px;border-radius:18px}.settings-grid{grid-template-columns:1fr;}}

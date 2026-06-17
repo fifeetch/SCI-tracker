@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1f9d85">
 <title>SCI Family - Version 2.0</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <!-- ══ FIREBASE CDN — chargé en premier dans le head ══ -->
@@ -11,6 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -839,6 +843,9 @@
     <button class="settings-tile" type="button" data-settings-target="access" onclick="selectSettingsSection('access')">
       <span>🔐</span><strong>Sécurité & accès</strong><small>Droits gérant ou associé</small><b>Ouvrir ›</b>
     </button>
+    <button class="settings-tile" type="button" data-settings-target="notifications" onclick="selectSettingsSection('notifications')">
+      <span>🔔</span><strong>Notifications</strong><small>Téléphone, messages et rendez-vous</small><b>Ouvrir ›</b>
+    </button>
     <button class="settings-tile" type="button" data-settings-target="firebase" onclick="selectSettingsSection('firebase')">
       <span>🔥</span><strong>Firebase</strong><small>Projet, structure et cache local</small><b>Ouvrir ›</b>
     </button>
@@ -952,6 +959,28 @@
       <div class="divider"></div>
       <p style="font-size:13px;color:var(--text2);line-height:1.6">Les gérants peuvent tout modifier. Les associés peuvent uniquement consulter les biens, documents, comptes et échéances.</p>
       <p class="readonly-note">V1.1.2 : la SCI active est lue depuis <strong>users/{UID}.activeSci</strong>. SCI Claudine doit utiliser <strong>scis/default</strong> pour tous les gérants.</p>
+    </div>
+    <div class="settings-section-title" data-settings-section="notifications">Notifications téléphone</div>
+    <div class="card settings-notification-card" data-settings-section="notifications" style="cursor:default">
+      <div class="card-hd"><div><div class="card-title">🔔 Notifications gérants</div><div class="card-sub">Messages et rendez-vous sur ce téléphone</div></div></div>
+      <div class="divider"></div>
+      <div class="settings-info-list">
+        <div><span>Statut navigateur</span><strong id="push-permission-status">—</strong></div>
+        <div><span>Appareil enregistré</span><strong id="push-device-status">—</strong></div>
+        <div><span>Compatibilité</span><strong id="push-support-status">—</strong></div>
+      </div>
+      <div class="divider"></div>
+      <div class="fg write-only">
+        <label>Clé publique VAPID Firebase</label>
+        <input type="text" id="push-vapid-key" placeholder="Coller la clé Web Push Firebase">
+      </div>
+      <div class="modal-actions write-only">
+        <button class="btn-out" type="button" onclick="savePushConfig()">Enregistrer la clé</button>
+        <button class="btn" type="button" onclick="enablePushNotifications()">Activer cet appareil</button>
+        <button class="btn-out" type="button" onclick="testLocalNotification()">Tester</button>
+      </div>
+      <button class="btn-del write-only" type="button" onclick="disablePushNotifications()">Désactiver cet appareil</button>
+      <p class="readonly-note">Sur iPhone, les notifications web fonctionnent quand le site est ajouté à l’écran d’accueil. L’envoi automatique distant sera branché sur les tokens enregistrés ici.</p>
     </div>
     <div class="settings-section-title" data-settings-section="firebase">Firebase et déploiement</div>
     <div class="card settings-firebase-card" data-settings-section="firebase" style="cursor:default">
