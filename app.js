@@ -1878,40 +1878,185 @@ function setBar(id, pct){
   const el=$(id); if(!el) return;
   el.style.width=Math.max(0,Math.min(100,pct||0))+'%';
 }
-function renderFinancialDashboard(){
-  const year=selectedBudgetYear();
+const FINANCE_KPI_DEFS=[
+  {key:'realNet', title:'Résultat réel', help:'Recettes - charges'},
+  {key:'realRec', title:'Recettes encaissées', help:'Journal comptable'},
+  {key:'realChg', title:'Charges payées', help:'Journal comptable'},
+  {key:'bankBalance', title:'Solde bancaire', help:'Solde estimé'},
+  {key:'docRate', title:'Justificatifs', help:'Pièces et OK bancaire'},
+  {key:'gap', title:'Écart réel / prévu', help:'Comparaison budget'},
+  {key:'budgetUsed', title:'Budget consommé', help:'Charges / budget'},
+  {key:'missingDocs', title:'À justifier', help:'Opérations à traiter'}
+];
+const FINANCE_CHART_DEFS=[
+  {key:'monthly', title:'Flux mensuels'},
+  {key:'charges', title:'Charges par catégorie'},
+  {key:'topCharges', title:'Top charges'},
+  {key:'docs', title:'Justificatifs'},
+  {key:'recettes', title:'Recettes par catégorie'}
+];
+function financeDashboardStorageKey(){ return 'sci_finance_dashboard_'+(SCI_ID||'default'); }
+function defaultFinanceDashboardConfig(){
+  return {mode:'compact',collapsed:false,kpis:['realNet','realRec','realChg','bankBalance'],mainChart:'monthly',sideCharts:['charges','topCharges']};
+}
+function getFinanceDashboardConfig(){
+  const def=defaultFinanceDashboardConfig();
+  try{
+    const saved=JSON.parse(localStorage.getItem(financeDashboardStorageKey())||'null');
+    return {...def,...(saved||{}),kpis:Array.isArray(saved?.kpis)&&saved.kpis.length?saved.kpis:def.kpis,sideCharts:Array.isArray(saved?.sideCharts)?saved.sideCharts:def.sideCharts};
+  }catch(e){ return def; }
+}
+function setFinanceDashboardConfig(cfg){
+  localStorage.setItem(financeDashboardStorageKey(), JSON.stringify({...getFinanceDashboardConfig(),...cfg}));
+}
+function toggleFinanceDashboard(){
+  const cfg=getFinanceDashboardConfig();
+  setFinanceDashboardConfig({collapsed:!cfg.collapsed});
+  renderFinancialDashboard();
+}
+function toggleFinanceDashboardMode(){
+  const cfg=getFinanceDashboardConfig();
+  setFinanceDashboardConfig({mode:cfg.mode==='compact'?'detail':'compact'});
+  renderFinancialDashboard();
+}
+function financeMoney(n){ return (+n||0).toLocaleString('fr-FR')+' €'; }
+function financeShortMoney(n){
+  const v=Math.abs(+n||0);
+  if(v>=1000) return ((+n||0)/1000).toLocaleString('fr-FR',{maximumFractionDigits:1})+' k€';
+  return financeMoney(n);
+}
+function financeDocMissing(op){ return !op.docId && !op.noDocRequired && !op.justificatifNotRequired; }
+function financeData(year){
   const ops=(window.CACHE?.ops||[]).filter(o=>o.date && new Date(o.date).getFullYear()===+year);
   const budgets=(window.CACHE?.budgets||[]).filter(b=>+b.year===+year);
   const realRec=ops.filter(o=>(+o.mt||0)>0).reduce((s,o)=>s+(+o.mt||0),0);
   const realChg=ops.filter(o=>(+o.mt||0)<0).reduce((s,o)=>s+Math.abs(+o.mt||0),0);
   const plannedRec=budgets.filter(b=>b.type==='recette').reduce((s,b)=>s+(+b.mt||0),0);
   const plannedChg=budgets.filter(b=>b.type==='charge').reduce((s,b)=>s+(+b.mt||0),0);
-  const realNet=realRec-realChg, plannedNet=plannedRec-plannedChg, gap=realNet-plannedNet;
-  const missing=ops.filter(o=>!o.docId);
-  const docRate=ops.length ? Math.round(((ops.length-missing.length)/ops.length)*100) : 0;
-  const money=n=>(+n||0).toLocaleString('fr-FR')+' €';
-  const set=(id,val)=>{const el=$(id);if(el)el.textContent=val;};
-  set('fd-real-net',money(realNet));
-  set('fd-budget-net',money(plannedNet));
-  set('fd-gap',(gap>=0?'+':'')+money(gap));
-  set('fd-gap-help',gap>=0?'Au-dessus du prévisionnel':'Sous le prévisionnel');
-  const gapEl=$('fd-gap'); if(gapEl) gapEl.style.color=gap>=0?'var(--green)':'var(--red)';
-  set('fd-doc-rate',docRate+'%');
-  set('fd-doc-help',missing.length+' opération(s) sans justificatif');
-  set('fd-bar-rec-label',money(realRec)+' / '+money(plannedRec));
-  set('fd-bar-chg-label',money(realChg)+' / '+money(plannedChg));
-  set('fd-consumed-label',pctLabel(realChg, plannedChg));
-  setBar('fd-bar-rec', plannedRec?realRec/plannedRec*100:(realRec?100:0));
-  setBar('fd-bar-chg', plannedChg?realChg/plannedChg*100:(realChg?100:0));
-  setBar('fd-bar-consumed', plannedChg?realChg/plannedChg*100:0);
-  const alerts=[];
-  if(!budgets.length) alerts.push(['Budget prévisionnel','À créer']);
-  if(missing.length) alerts.push(['Justificatifs manquants',missing.length]);
-  if(plannedChg && realChg>plannedChg) alerts.push(['Charges au-dessus budget','+'+money(realChg-plannedChg)]);
-  if(plannedRec && realRec<plannedRec) alerts.push(['Recettes sous budget','-'+money(plannedRec-realRec)]);
-  if(!alerts.length) alerts.push(['Situation comptable','OK']);
-  const box=$('fd-alerts');
-  if(box) box.innerHTML=alerts.map(a=>`<div class="finance-list-row"><span>${esc(a[0])}</span><strong>${esc(a[1])}</strong></div>`).join('');
+  const missing=ops.filter(financeDocMissing);
+  const okBank=ops.filter(o=>!o.docId && (o.noDocRequired||o.justificatifNotRequired));
+  const docLinked=ops.filter(o=>o.docId);
+  const verify=ops.filter(o=>o.status==='a_verifier' || o.cat==='À classer');
+  const bank=estimatedBankBalance();
+  return {year,ops,budgets,realRec,realChg,realNet:realRec-realChg,plannedRec,plannedChg,plannedNet:plannedRec-plannedChg,gap:(realRec-realChg)-(plannedRec-plannedChg),missing,okBank,docLinked,verify,bankBalance:bank?.balance??null,docRate:ops.length?Math.round(((ops.length-missing.length)/ops.length)*100):0,budgetUsed:plannedChg?Math.round(realChg/plannedChg*100):(realChg?100:0)};
+}
+function financeKpiValue(key,data){
+  const map={
+    realNet:[financeMoney(data.realNet), 'Recettes - charges'],
+    realRec:[financeMoney(data.realRec), 'Journal comptable'],
+    realChg:[financeMoney(data.realChg), 'Journal comptable'],
+    bankBalance:[data.bankBalance==null?'—':financeMoney(data.bankBalance), data.bankBalance==null?'À renseigner':'Solde estimé'],
+    docRate:[data.docRate+'%', data.missing.length+' opération(s) à justifier'],
+    gap:[(data.gap>=0?'+':'')+financeMoney(data.gap), data.gap>=0?'Au-dessus du prévisionnel':'Sous le prévisionnel'],
+    budgetUsed:[data.budgetUsed+'%', data.plannedChg?'Charges / budget':'Budget à créer'],
+    missingDocs:[String(data.missing.length), 'Opérations sans justificatif']
+  };
+  return map[key] || ['—',''];
+}
+function renderFinanceKpis(cfg,data){
+  const grid=$('finance-kpi-grid'); if(!grid) return;
+  const keys=(cfg.kpis||[]).filter(k=>FINANCE_KPI_DEFS.some(d=>d.key===k)).slice(0,4);
+  grid.innerHTML=keys.map(key=>{
+    const def=FINANCE_KPI_DEFS.find(d=>d.key===key);
+    const [value,help]=financeKpiValue(key,data);
+    const color=key==='realChg'||key==='missingDocs'?'var(--red)':(key==='gap'&&data.gap<0?'var(--red)':'var(--gold)');
+    return `<div class="finance-kpi"><span>${esc(def.title)}</span><strong style="color:${color}">${esc(value)}</strong><small>${esc(help||def.help)}</small></div>`;
+  }).join('');
+}
+function entriesByCategory(ops, type){
+  const map=new Map();
+  ops.filter(o=>type==='recette'?(+o.mt||0)>0:(+o.mt||0)<0).forEach(o=>{
+    const cat=o.cat||'Autre';
+    map.set(cat,(map.get(cat)||0)+Math.abs(+o.mt||0));
+  });
+  return [...map.entries()].sort((a,b)=>b[1]-a[1]);
+}
+function chartEmpty(title,msg){ return `<h4>${esc(title)}</h4><div class="finance-chart-empty">${esc(msg)}</div>`; }
+function renderMonthlyChart(data){
+  if(!data.ops.length) return chartEmpty('Flux mensuels','Aucune opération sur cette année.');
+  const months=['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+  const vals=months.map((m,idx)=>{
+    const ops=data.ops.filter(o=>new Date(o.date).getMonth()===idx);
+    const rec=ops.filter(o=>(+o.mt||0)>0).reduce((s,o)=>s+(+o.mt||0),0);
+    const chg=ops.filter(o=>(+o.mt||0)<0).reduce((s,o)=>s+Math.abs(+o.mt||0),0);
+    return {m,rec,chg,net:rec-chg};
+  });
+  const max=Math.max(1,...vals.flatMap(x=>[x.rec,x.chg,Math.abs(x.net)]));
+  return `<h4>Flux mensuels</h4><div class="finance-month-chart">${vals.map(x=>`<div class="finance-month"><div class="finance-month-bars"><i title="Recettes ${financeMoney(x.rec)}" style="--h:${Math.round(x.rec/max*100)}%"></i><i class="charge" title="Charges ${financeMoney(x.chg)}" style="--h:${Math.round(x.chg/max*100)}%"></i><i class="net" title="Résultat ${financeMoney(x.net)}" style="--h:${Math.round(Math.abs(x.net)/max*100)}%"></i></div><span>${x.m}</span></div>`).join('')}</div><div class="finance-chart-legend"><span><i style="background:var(--green)"></i>Recettes</span><span><i style="background:var(--red)"></i>Charges</span><span><i style="background:var(--blue)"></i>Résultat</span></div>`;
+}
+function renderDonutChart(title,entries,totalLabel){
+  if(!entries.length) return chartEmpty(title,'Données insuffisantes.');
+  const colors=['#159a7f','#2f6ecb','#e05a4b','#c9a84c','#8b6fe8','#7a8f45'];
+  const total=entries.reduce((s,x)=>s+x[1],0)||1;
+  let acc=0;
+  const segs=entries.slice(0,6).map((x,i)=>{ const from=acc; acc+=x[1]/total*100; return `${colors[i%colors.length]} ${from}% ${acc}%`; });
+  const leg=entries.slice(0,6).map((x,i)=>`<div class="finance-legend-row"><span><i style="background:${colors[i%colors.length]}"></i>${esc(x[0])}</span><strong>${financeShortMoney(x[1])}</strong></div>`).join('');
+  return `<h4>${esc(title)}</h4><div class="finance-donut-row"><div class="finance-donut" style="background:conic-gradient(${segs.join(',')})"><b>${esc(totalLabel||financeShortMoney(total))}</b></div><div class="finance-legend-list">${leg}</div></div>`;
+}
+function renderHBarChart(title,entries){
+  if(!entries.length) return chartEmpty(title,'Données insuffisantes.');
+  const max=Math.max(1,...entries.map(x=>x[1]));
+  return `<h4>${esc(title)}</h4><div class="finance-hbar-list">${entries.slice(0,6).map((x,i)=>`<div class="finance-hbar-row"><span>${esc(x[0])}</span><div class="finance-hbar"><i style="--w:${Math.round(x[1]/max*100)}%;background:${i%2?'var(--blue)':'var(--gold)'}"></i></div><strong>${financeShortMoney(x[1])}</strong></div>`).join('')}</div>`;
+}
+function renderDocsChart(data){
+  const entries=[['Justificatif',data.docLinked.length],['OK bancaire',data.okBank.length],['Manquant',data.missing.length],['À vérifier',data.verify.length]];
+  const total=Math.max(1,data.ops.length);
+  return `<h4>Justificatifs</h4><div class="finance-status-stack">${entries.map((x,i)=>`<i class="${['','bank','missing','verify'][i]}" style="--w:${Math.round(x[1]/total*100)}%"></i>`).join('')}</div><div class="finance-legend-list">${entries.map(x=>`<div class="finance-legend-row"><span>${esc(x[0])}</span><strong>${x[1]}</strong></div>`).join('')}</div>`;
+}
+function renderFinanceChart(key,data){
+  if(key==='monthly') return renderMonthlyChart(data);
+  if(key==='charges') return renderDonutChart('Charges par catégorie', entriesByCategory(data.ops,'charge'), financeShortMoney(data.realChg));
+  if(key==='topCharges') return renderHBarChart('Top charges', entriesByCategory(data.ops,'charge'));
+  if(key==='docs') return renderDocsChart(data);
+  if(key==='recettes') return renderDonutChart('Recettes par catégorie', entriesByCategory(data.ops,'recette'), financeShortMoney(data.realRec));
+  return chartEmpty('Graphique','Choisis un graphique.');
+}
+function applyFinanceDashboardShell(cfg){
+  const box=$('finance-dashboard'); if(!box) return;
+  box.classList.toggle('collapsed', !!cfg.collapsed);
+  box.classList.toggle('compact', cfg.mode!=='detail');
+  const modeBtn=$('finance-mode-btn'); if(modeBtn) modeBtn.textContent=cfg.mode==='detail'?'Vue détaillée':'Vue compacte';
+  const collapseBtn=$('finance-collapse-btn'); if(collapseBtn) collapseBtn.textContent=cfg.collapsed?'›':'⌄';
+}
+function renderFinancialDashboard(){
+  const year=selectedBudgetYear();
+  const cfg=getFinanceDashboardConfig();
+  const data=financeData(year);
+  applyFinanceDashboardShell(cfg);
+  renderFinanceKpis(cfg,data);
+  const main=$('finance-main-chart'), s1=$('finance-side-chart-1'), s2=$('finance-side-chart-2');
+  if(main) main.innerHTML=renderFinanceChart(cfg.mainChart||'monthly',data);
+  if(s1) s1.innerHTML=renderFinanceChart((cfg.sideCharts||[])[0]||'charges',data);
+  if(s2) s2.innerHTML=renderFinanceChart((cfg.sideCharts||[])[1]||'topCharges',data);
+}
+function openFinanceDashboardConfigModal(){
+  const cfg=getFinanceDashboardConfig();
+  const box=$('finance-kpi-config');
+  if(box){
+    box.innerHTML=FINANCE_KPI_DEFS.map(def=>`<label><input type="checkbox" value="${esc(def.key)}" ${cfg.kpis.includes(def.key)?'checked':''}>${esc(def.title)}</label>`).join('');
+  }
+  const fillSelect=(id,value)=>{
+    const sel=$(id); if(!sel) return;
+    sel.innerHTML=FINANCE_CHART_DEFS.map(def=>`<option value="${esc(def.key)}">${esc(def.title)}</option>`).join('');
+    sel.value=value;
+  };
+  fillSelect('finance-main-chart-select',cfg.mainChart||'monthly');
+  fillSelect('finance-side-chart-1-select',(cfg.sideCharts||[])[0]||'charges');
+  fillSelect('finance-side-chart-2-select',(cfg.sideCharts||[])[1]||'topCharges');
+  openModal('m-finance-dashboard-config');
+}
+function saveFinanceDashboardConfig(){
+  const kpis=[...document.querySelectorAll('#finance-kpi-config input:checked')].map(x=>x.value);
+  if(!kpis.length){ alert('Choisis au moins un KPI.'); return; }
+  if(kpis.length>4){ alert('Choisis au maximum 4 KPI pour garder le dashboard lisible.'); return; }
+  setFinanceDashboardConfig({
+    kpis,
+    mainChart:$('finance-main-chart-select')?.value || 'monthly',
+    sideCharts:[$('finance-side-chart-1-select')?.value || 'charges', $('finance-side-chart-2-select')?.value || 'topCharges']
+  });
+  closeModal('m-finance-dashboard-config');
+  renderFinancialDashboard();
+  toast('Dashboard financier mis à jour ✓');
 }
 
 function bankBalanceRef(){

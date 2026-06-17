@@ -355,36 +355,27 @@
     <div><h2>Comptabilité</h2><p>Pilotage financier, journal comptable, budget prévisionnel et préparation comptable.</p></div>
   </div>
 
-  <div class="finance-dashboard">
+  <div class="finance-dashboard" id="finance-dashboard">
     <div class="finance-head">
       <div>
         <h3>📈 Dashboard financier</h3>
         <p>Suivi annuel de la performance : réel, prévisionnel, écarts et alertes comptables.</p>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="finance-dashboard-actions">
+        <button class="btn-out btn-sm" id="finance-mode-btn" onclick="toggleFinanceDashboardMode()">Vue compacte</button>
+        <button class="btn-out btn-sm" onclick="openFinanceDashboardConfigModal()">Configurer</button>
         <button class="btn-out btn-sm" onclick="document.getElementById('compta-preparation')?.classList.add('open');document.getElementById('compta-preparation')?.scrollIntoView({behavior:'smooth',block:'start'})">Préparation comptable</button>
         <button class="btn-out btn-sm" onclick="exportComptableCSV()">Export complet</button>
+        <button class="btn-out btn-sm finance-collapse-btn" id="finance-collapse-btn" onclick="toggleFinanceDashboard()">⌄</button>
       </div>
     </div>
-    <div class="finance-grid">
-      <div class="finance-kpi"><span>Résultat réel</span><strong id="fd-real-net">—</strong><small id="fd-real-help">Recettes - charges</small></div>
-      <div class="finance-kpi"><span>Résultat prévu</span><strong id="fd-budget-net">—</strong><small>Budget prévisionnel annuel</small></div>
-      <div class="finance-kpi"><span>Écart réel / prévu</span><strong id="fd-gap">—</strong><small id="fd-gap-help">Comparaison annuelle</small></div>
-      <div class="finance-kpi"><span>Justificatifs</span><strong id="fd-doc-rate">—</strong><small id="fd-doc-help">Pièces reliées aux opérations</small></div>
-    </div>
-    <div class="finance-split">
-      <div class="finance-mini">
-        <h4>Prévisionnel vs réel</h4>
-        <div class="finance-bars">
-          <div class="finance-bar-row"><span>Recettes</span><div class="finance-bar"><div class="finance-bar-fill good" id="fd-bar-rec"></div></div><span id="fd-bar-rec-label">—</span></div>
-          <div class="finance-bar-row"><span>Charges</span><div class="finance-bar"><div class="finance-bar-fill bad" id="fd-bar-chg"></div></div><span id="fd-bar-chg-label">—</span></div>
-          <div class="finance-bar-row"><span>Budget consommé</span><div class="finance-bar"><div class="finance-bar-fill" id="fd-bar-consumed"></div></div><span id="fd-consumed-label">—</span></div>
-        </div>
-      </div>
-      <div class="finance-mini">
-        <h4>Points de vigilance</h4>
-        <div class="finance-list" id="fd-alerts">
-          <div class="finance-list-row"><span>Analyse en cours</span><strong>—</strong></div>
+    <div class="finance-dashboard-body" id="finance-dashboard-body">
+      <div class="finance-grid" id="finance-kpi-grid"></div>
+      <div class="finance-chart-layout" id="finance-chart-layout">
+        <div class="finance-chart-card finance-chart-main" id="finance-main-chart"></div>
+        <div class="finance-chart-side">
+          <div class="finance-chart-card" id="finance-side-chart-1"></div>
+          <div class="finance-chart-card" id="finance-side-chart-2"></div>
         </div>
       </div>
     </div>
@@ -1154,6 +1145,30 @@
       <button class="btn-del" id="op-del" style="display:none" onclick="confirmDel('op')">🗑 Supprimer</button>
       <button class="btn-out" onclick="closeModal('m-op')">Annuler</button>
       <button class="btn" onclick="saveOp()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Configuration dashboard financier -->
+<div class="modal-overlay" id="m-finance-dashboard-config">
+  <div class="modal finance-config-modal">
+    <h3>📈 Configurer le dashboard</h3>
+    <p class="small-help">Choisis jusqu’à 4 KPI et les graphiques affichés dans le dashboard financier.</p>
+    <div class="finance-config-section">
+      <h4>KPI affichés</h4>
+      <div class="finance-config-checks" id="finance-kpi-config"></div>
+    </div>
+    <div class="finance-config-section">
+      <h4>Graphiques</h4>
+      <div class="frow">
+        <div class="fg"><label>Graphique principal</label><select id="finance-main-chart-select"></select></div>
+        <div class="fg"><label>Graphique secondaire 1</label><select id="finance-side-chart-1-select"></select></div>
+      </div>
+      <div class="fg"><label>Graphique secondaire 2</label><select id="finance-side-chart-2-select"></select></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-out" onclick="closeModal('m-finance-dashboard-config')">Annuler</button>
+      <button class="btn" onclick="saveFinanceDashboardConfig()">Enregistrer</button>
     </div>
   </div>
 </div>
