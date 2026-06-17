@@ -3362,13 +3362,50 @@ function selectChannel(ch,btn){
 async function addActivity(type, action){
   try{ await colRef('activity').add({type,action,userUid:auth.currentUser?.uid||'',userName:currentUserName(),createdAt:firebase.firestore.FieldValue.serverTimestamp()}); }catch(e){ console.warn('Activity non enregistrée', e); }
 }
+function managerRecipients(){
+  return (window.CACHE?.associes||[]).filter(a=>{
+    const role=String(a.role||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return role.includes('gerant') && a.email;
+  }).map(a=>({email:a.email,name:[a.prenom,a.nom].filter(Boolean).join(' ')||a.email}));
+}
+function mailtoLink(recipients, subject, body){
+  const emails=(recipients||[]).map(r=>r.email).filter(Boolean).join(',');
+  if(!emails) return '';
+  return 'mailto:'+encodeURIComponent(emails)+'?subject='+encodeURIComponent(subject||'SCI Family')+'&body='+encodeURIComponent(body||'');
+}
+async function notifyManagers(type, refId, title, text, mailSubject, mailBody){
+  try{
+    const recipients=managerRecipients();
+    await colRef('alerts').add({
+      id:Date.now(),
+      type,
+      refId:String(refId||''),
+      title,
+      text,
+      targetRoles:['gerant'],
+      mailto:mailtoLink(recipients, mailSubject||title, mailBody||text),
+      createdBy:auth.currentUser?.uid||'',
+      createdByName:currentUserName(),
+      createdAt:firebase.firestore.FieldValue.serverTimestamp(),
+      dismissedBy:[auth.currentUser?.uid||'']
+    });
+  }catch(err){ console.warn('Notification gérant non créée', err); }
+}
 async function sendMessage(){
   const txt=(v('msg-text')||'').trim();
   if(!txt){toast('Message vide');return;}
   try{
-    await colRef('messages').add({channel:currentChannel,authorUid:auth.currentUser?.uid||'',authorName:currentUserName(),authorPhoto:profilePhotoUrl(),role:APP_STATE.role,message:txt,createdAt:firebase.firestore.FieldValue.serverTimestamp(),readBy:[auth.currentUser?.uid||'']});
+    const ref=await colRef('messages').add({channel:currentChannel,authorUid:auth.currentUser?.uid||'',authorName:currentUserName(),authorPhoto:profilePhotoUrl(),role:APP_STATE.role,message:txt,createdAt:firebase.firestore.FieldValue.serverTimestamp(),readBy:[auth.currentUser?.uid||'']});
     sv('msg-text','');
     await addActivity('message', currentUserName()+' a publié un message');
+    await notifyManagers(
+      'message',
+      ref.id,
+      'Nouveau message',
+      (CHANNEL_LABELS[currentChannel]||currentChannel)+' · '+currentUserName()+' : '+txt.slice(0,120),
+      'Nouveau message SCI Family',
+      `Bonjour,\n\nUn nouveau message a été publié dans SCI Family.\n\nCanal : ${CHANNEL_LABELS[currentChannel]||currentChannel}\nAuteur : ${currentUserName()}\nMessage :\n${txt}\n\nLien : https://sci-family-ab82c.web.app\n`
+    );
     toast('Message envoyé ✓');
   }catch(err){console.error(err);toast(formatFirebaseError(err));}
 }
@@ -3735,7 +3772,20 @@ async function saveEch(){
   const id=v('ech-id'),e=!!id,sb=$('ech-bien'),sl=$('ech-loc'),ed=$('ech-done');
   const obj={id:e?+id:Date.now(),titre:v('ech-titre'),date:v('ech-date'),type:v('ech-type'),bien:sb?.value||'',loc:sl?.value||'',mt:+v('ech-mt')||0,notes:v('ech-notes'),done:ed?.checked||false,heure:v('ech-heure'),duree:+v('ech-duree')||0,lieu:v('ech-lieu'),guests:selectedMeetingGuests()};
   const ok = await saveWithFeedback(window.dbSet?.('echs',obj), e?'Échéance mise à jour ✓':'Échéance ajoutée ✓');
-  if(ok) closeModal('m-ech');
+  if(ok){
+    if(!e && (obj.type==='reunion' || obj.heure || obj.duree)){
+      const details=[fmtDate(obj.date), obj.heure?'à '+obj.heure:'', obj.lieu||''].filter(Boolean).join(' · ');
+      await notifyManagers(
+        'reunion',
+        obj.id,
+        obj.type==='reunion'?'Nouveau rendez-vous':'Nouvelle échéance avec horaire',
+        (obj.titre||'Rendez-vous')+' · '+details,
+        'Nouveau rendez-vous SCI Family',
+        `Bonjour,\n\nUn nouveau rendez-vous / une nouvelle échéance avec horaire a été ajouté(e) dans SCI Family.\n\nTitre : ${obj.titre||'Rendez-vous'}\nDate : ${fmtDate(obj.date)}\nHeure : ${obj.heure||'à préciser'}\nLieu : ${obj.lieu||'à préciser'}\nNotes : ${obj.notes||'-'}\n\nLien : https://sci-family-ab82c.web.app\n`
+      );
+    }
+    closeModal('m-ech');
+  }
 }
 function sendMeetingEmails(){
   const guests=selectedMeetingGuests();
@@ -3787,15 +3837,23 @@ function markAlertViewedLocal(key){
 }
 function decisionAlertKey(d){ return 'vote:'+(d.id||d.title||'decision'); }
 function meetingAlertKey(e){ return 'reunion:'+(e.id||[e.date,e.heure,e.titre||e.title||''].join('|')); }
+function alertVisibleForCurrentUser(a){
+  const roles=Array.isArray(a.targetRoles)?a.targetRoles:[];
+  const uids=Array.isArray(a.targetUids)?a.targetUids:[];
+  const uid=auth.currentUser?.uid||'';
+  if(uids.length && !uids.includes(uid)) return false;
+  if(roles.length && !roles.includes(APP_STATE.role)) return false;
+  return true;
+}
 function getPendingItems(){
   const uid=auth.currentUser?.uid||'';
   const prefs=getHomePreferences();
   const allowed=new Set(prefs.alerts||DEFAULT_HOME_ALERT_KEYS);
   const decisions=allowed.has('vote')?(window.CACHE?.decisions||[]).filter(d=>decisionStatus(d)==='pending'&&!myVotedDecision(d)&&!isAlertViewed(decisionAlertKey(d))).map(d=>({type:'vote',title:'Vote en attente',text:d.title||'Décision à voter',key:decisionAlertKey(d),action:()=>{closeModal('m-alerts');goPage('associes');}})):[];
-  const flagged=(window.CACHE?.alerts||[]).filter(a=>!(a.dismissedBy||[]).includes(uid)&&!isAlertViewed('alert:'+(a.id||a.refId||a.title||''))).filter(a=>{
+  const flagged=(window.CACHE?.alerts||[]).filter(alertVisibleForCurrentUser).filter(a=>!(a.dismissedBy||[]).includes(uid)&&!isAlertViewed('alert:'+(a.id||a.refId||a.title||''))).filter(a=>{
     const t=a.type||'flagged';
     return allowed.has(t) || (t==='alerte'&&allowed.has('flagged'));
-  }).map(a=>({type:a.type||'alerte',title:a.title||'Alerte',text:a.text||'',id:a.id,key:'alert:'+(a.id||a.refId||a.title||''),source:'alerts',action:()=>openAlertTarget(a)}));
+  }).map(a=>({type:a.type||'alerte',title:a.title||'Alerte',text:a.text||'',id:a.id,key:'alert:'+(a.id||a.refId||a.title||''),source:'alerts',mailto:a.mailto||'',action:()=>openAlertTarget(a)}));
   const meetings=allowed.has('reunion')?(window.CACHE?.echs||[]).filter(e=>!e.done&&new Date(e.date)>=new Date()&&(e.type==='reunion'||e.heure||e.duree)&&!isAlertViewed(meetingAlertKey(e))).sort((a,b)=>new Date(a.date)-new Date(b.date)).map(e=>{
     const details=[fmtDate(e.date), e.heure?'à '+e.heure:'', e.duree?e.duree+' min':''].filter(Boolean).join(' · ');
     return {type:'reunion',title:e.type==='reunion'?'Rendez-vous à venir':'Échéance avec horaire',text:(e.titre||'Échéance')+' · '+details,key:meetingAlertKey(e),action:()=>{closeModal('m-alerts');goPage('echeances');}};
@@ -3813,7 +3871,7 @@ function renderHomeAlerts(){
 }
 function openAlertsModal(){
   const items=getPendingItems(), box=$('alerts-modal-list');
-  if(box) box.innerHTML=items.length?items.map((it,i)=>`<div class="ech-item" onclick="window.__alertAction${i}&&window.__alertAction${i}()"><div class="ech-icon">${it.type==='vote'?'🗳':it.type==='reunion'?'🤝':'❗'}</div><div class="ech-body"><div class="ech-title">${esc(it.title)}</div><div class="ech-sub">${esc(it.text)}</div></div><div class="ech-right"><span class="days-badge urgent">Vu</span></div></div>`).join(''):'<div class="ech-empty">Aucune alerte en cours.</div>';
+  if(box) box.innerHTML=items.length?items.map((it,i)=>`<div class="ech-item" onclick="window.__alertAction${i}&&window.__alertAction${i}()"><div class="ech-icon">${it.type==='vote'?'🗳':it.type==='reunion'?'🤝':it.type==='message'?'💬':'❗'}</div><div class="ech-body"><div class="ech-title">${esc(it.title)}</div><div class="ech-sub">${esc(it.text)}</div></div><div class="ech-right">${it.mailto?`<button class="btn-out btn-sm" onclick="event.stopPropagation();location.href='${esc(it.mailto)}'">Email</button>`:''}<span class="days-badge urgent">Vu</span></div></div>`).join(''):'<div class="ech-empty">Aucune alerte en cours.</div>';
   items.forEach((it,i)=>window['__alertAction'+i]=()=>openPendingAlert(it));
   openModal('m-alerts');
 }
