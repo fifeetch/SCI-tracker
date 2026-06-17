@@ -695,7 +695,7 @@ auth.onAuthStateChanged(async user=>{
       window.SCIapp?.init();
       // V1.1.5 : après connexion, ouvrir systématiquement l'écran de choix des structures.
       // Cela limite les erreurs entre SCI Claudine, SCI Catherine et GFA familial.
-      goPage('mes-scis');
+      goPage(isGFAContext() ? 'gfa' : 'home');
     } catch(err){
       console.error('Erreur après connexion Firebase :', err);
       window.SCIapp?.toast('Erreur Firebase : ' + err.message);
@@ -3373,18 +3373,40 @@ SCI Family`;
 
 // ══ ALERTES ACCUEIL ══
 function myVotedDecision(d){ return (d.votes||[]).some(v=>v.voterUid===auth.currentUser?.uid); }
+function viewedAlertsStorageKey(){
+  const uid=auth.currentUser?.uid||'anon';
+  return 'sciFamily.viewedAlerts.v1.'+uid+'.'+(SCI_ID||'default');
+}
+function viewedAlertKeys(){
+  try{
+    const raw=localStorage.getItem(viewedAlertsStorageKey());
+    const parsed=JSON.parse(raw||'[]');
+    return Array.isArray(parsed)?parsed:[];
+  }catch(e){ return []; }
+}
+function isAlertViewed(key){
+  return !!key && viewedAlertKeys().includes(String(key));
+}
+function markAlertViewedLocal(key){
+  if(!key) return;
+  const keys=viewedAlertKeys();
+  const next=[String(key),...keys.filter(k=>k!==String(key))].slice(0,300);
+  localStorage.setItem(viewedAlertsStorageKey(), JSON.stringify(next));
+}
+function decisionAlertKey(d){ return 'vote:'+(d.id||d.title||'decision'); }
+function meetingAlertKey(e){ return 'reunion:'+(e.id||[e.date,e.heure,e.titre||e.title||''].join('|')); }
 function getPendingItems(){
   const uid=auth.currentUser?.uid||'';
   const prefs=getHomePreferences();
   const allowed=new Set(prefs.alerts||DEFAULT_HOME_ALERT_KEYS);
-  const decisions=allowed.has('vote')?(window.CACHE?.decisions||[]).filter(d=>decisionStatus(d)==='pending'&&!myVotedDecision(d)).map(d=>({type:'vote',title:'Vote en attente',text:d.title||'Décision à voter',action:()=>{closeModal('m-alerts');goPage('associes');}})):[];
-  const flagged=(window.CACHE?.alerts||[]).filter(a=>!(a.dismissedBy||[]).includes(uid)).filter(a=>{
+  const decisions=allowed.has('vote')?(window.CACHE?.decisions||[]).filter(d=>decisionStatus(d)==='pending'&&!myVotedDecision(d)&&!isAlertViewed(decisionAlertKey(d))).map(d=>({type:'vote',title:'Vote en attente',text:d.title||'Décision à voter',key:decisionAlertKey(d),action:()=>{closeModal('m-alerts');goPage('associes');}})):[];
+  const flagged=(window.CACHE?.alerts||[]).filter(a=>!(a.dismissedBy||[]).includes(uid)&&!isAlertViewed('alert:'+(a.id||a.refId||a.title||''))).filter(a=>{
     const t=a.type||'flagged';
     return allowed.has(t) || (t==='alerte'&&allowed.has('flagged'));
-  }).map(a=>({type:a.type||'alerte',title:a.title||'Alerte',text:a.text||'',id:a.id,action:()=>openAlertTarget(a)}));
-  const meetings=allowed.has('reunion')?(window.CACHE?.echs||[]).filter(e=>!e.done&&new Date(e.date)>=new Date()&&(e.type==='reunion'||e.heure||e.duree)).sort((a,b)=>new Date(a.date)-new Date(b.date)).map(e=>{
+  }).map(a=>({type:a.type||'alerte',title:a.title||'Alerte',text:a.text||'',id:a.id,key:'alert:'+(a.id||a.refId||a.title||''),source:'alerts',action:()=>openAlertTarget(a)}));
+  const meetings=allowed.has('reunion')?(window.CACHE?.echs||[]).filter(e=>!e.done&&new Date(e.date)>=new Date()&&(e.type==='reunion'||e.heure||e.duree)&&!isAlertViewed(meetingAlertKey(e))).sort((a,b)=>new Date(a.date)-new Date(b.date)).map(e=>{
     const details=[fmtDate(e.date), e.heure?'à '+e.heure:'', e.duree?e.duree+' min':''].filter(Boolean).join(' · ');
-    return {type:'reunion',title:e.type==='reunion'?'Rendez-vous à venir':'Échéance avec horaire',text:(e.titre||'Échéance')+' · '+details,action:()=>{closeModal('m-alerts');goPage('echeances');}};
+    return {type:'reunion',title:e.type==='reunion'?'Rendez-vous à venir':'Échéance avec horaire',text:(e.titre||'Échéance')+' · '+details,key:meetingAlertKey(e),action:()=>{closeModal('m-alerts');goPage('echeances');}};
   }):[];
   return [...flagged,...decisions,...meetings];
 }
@@ -3399,9 +3421,40 @@ function renderHomeAlerts(){
 }
 function openAlertsModal(){
   const items=getPendingItems(), box=$('alerts-modal-list');
-  if(box) box.innerHTML=items.length?items.map((it,i)=>`<div class="ech-item" onclick="window.__alertAction${i}&&window.__alertAction${i}()"><div class="ech-icon">${it.type==='vote'?'🗳':it.type==='reunion'?'🤝':'❗'}</div><div class="ech-body"><div class="ech-title">${esc(it.title)}</div><div class="ech-sub">${esc(it.text)}</div></div><div class="ech-right"><span class="days-badge urgent">À voir</span></div></div>`).join(''):'<div class="ech-empty">Aucune alerte en cours.</div>';
-  items.forEach((it,i)=>window['__alertAction'+i]=it.action);
+  if(box) box.innerHTML=items.length?items.map((it,i)=>`<div class="ech-item" onclick="window.__alertAction${i}&&window.__alertAction${i}()"><div class="ech-icon">${it.type==='vote'?'🗳':it.type==='reunion'?'🤝':'❗'}</div><div class="ech-body"><div class="ech-title">${esc(it.title)}</div><div class="ech-sub">${esc(it.text)}</div></div><div class="ech-right"><span class="days-badge urgent">Vu</span></div></div>`).join(''):'<div class="ech-empty">Aucune alerte en cours.</div>';
+  items.forEach((it,i)=>window['__alertAction'+i]=()=>openPendingAlert(it));
   openModal('m-alerts');
+}
+async function dismissPendingAlert(it){
+  if(!it) return;
+  const uid=auth.currentUser?.uid||'';
+  if(it.source==='alerts' && it.id && uid){
+    try{
+      const patch={
+        dismissedBy: firebase.firestore.FieldValue.arrayUnion(uid),
+        dismissedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      const direct=await colRef('alerts').doc(String(it.id)).get();
+      if(direct.exists){
+        await direct.ref.update(patch);
+      } else {
+        const snap=await colRef('alerts').where('id','==',it.id).limit(1).get();
+        if(!snap.empty) await snap.docs[0].ref.update(patch);
+        else markAlertViewedLocal(it.key);
+      }
+    }catch(err){
+      console.error('Alerte non marquee comme vue dans Firebase', err);
+      markAlertViewedLocal(it.key);
+    }
+  } else {
+    markAlertViewedLocal(it.key);
+  }
+  renderHomeAlerts();
+  renderHome();
+}
+async function openPendingAlert(it){
+  await dismissPendingAlert(it);
+  if(typeof it?.action==='function') it.action();
 }
 function openAlertTarget(a){
   closeModal('m-alerts');
