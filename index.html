@@ -412,6 +412,7 @@
         <button class="btn-out write-only" onclick="document.getElementById('import-bank-ca-input').click()">🏦 Import Crédit Agricole CSV/Excel</button>
         <button class="btn-out write-only" onclick="openCreditAgricolePdfModal()">📄 Import relevé PDF CA</button>
         <button class="btn-out write-only" onclick="openBankBalanceModal()">🏦 Solde bancaire</button>
+        <button class="btn-out write-only" onclick="openAccountingRulesModal()">⚙️ Règles automatiques</button>
         <button class="btn write-only" onclick="openOpModal(null)">+ Opération</button>
       </div>
       <div class="compta-quick-kpis">
@@ -427,7 +428,7 @@
         <div class="fg"><label>Suivi</label><select id="journal-filter-status" onchange="renderCompta()"><option value="all">Tous statuts</option><option value="a_verifier">À vérifier</option><option value="missing_doc">Sans justificatif</option><option value="classified">Classées</option></select></div>
       </div>
       <div class="table-wrap">
-        <table><thead><tr><th>Date</th><th>Libellé</th><th>Bien</th><th>Catégorie</th><th>Justificatif</th><th>Montant</th><th></th></tr></thead>
+        <table class="journal-compact-table"><thead><tr><th>Date</th><th>Opération</th><th>Justificatif</th><th>Montant</th><th></th></tr></thead>
         <tbody id="c-table"></tbody></table>
       </div>
     </div>
@@ -1153,6 +1154,20 @@
       <button class="btn-del" id="op-del" style="display:none" onclick="confirmDel('op')">🗑 Supprimer</button>
       <button class="btn-out" onclick="closeModal('m-op')">Annuler</button>
       <button class="btn" onclick="saveOp()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Règles automatiques du journal -->
+<div class="modal-overlay" id="m-accounting-rules">
+  <div class="modal accounting-rules-modal">
+    <h3>⚙️ Règles automatiques du journal</h3>
+    <p class="small-help">Ces règles s’appliquent aux prochains imports bancaires. Elles ne s’affichent pas dans le journal comptable.</p>
+    <div id="accounting-rules-list" class="rules-list"></div>
+    <button class="btn-out" type="button" onclick="addAccountingRuleDraft()">+ Ajouter une règle</button>
+    <div class="modal-actions">
+      <button class="btn-out" onclick="closeModal('m-accounting-rules')">Fermer</button>
+      <button class="btn" onclick="saveAccountingRulesFromModal()">Enregistrer</button>
     </div>
   </div>
 </div>

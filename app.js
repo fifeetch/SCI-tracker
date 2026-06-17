@@ -1751,7 +1751,8 @@ async function importOpsCSV(event){
       if(!confirm(`${ops.length} opération(s) Crédit Agricole détectée(s).\nImporter ${newOps.length} nouvelle(s) opération(s) ?${ignored?`\n${ignored} doublon(s) ignoré(s).`:''}`)) return;
       let count=0;
       for(const o of newOps){
-        await window.dbSet?.('ops',{id:Date.now()+count,date:o.date,lib:o.lib,bien:'',cat:o.cat,type:o.type,payment:'Crédit Agricole',status:o.cat==='À classer'?'a_verifier':'paye',docId:'',mt:o.mt,sourceBank:'credit_agricole',sourceLabel:'Import Crédit Agricole CSV',bankImportId:bankImportKey(o.date,o.lib,o.mt),bankBalanceAfter:o.solde});
+        const obj=applyAccountingRulesToOp({id:Date.now()+count,date:o.date,lib:o.lib,bien:'',cat:o.cat,type:o.type,payment:'Crédit Agricole',status:o.cat==='À classer'?'a_verifier':'paye',docId:'',mt:o.mt,sourceBank:'credit_agricole',sourceLabel:'Import Crédit Agricole CSV',bankImportId:bankImportKey(o.date,o.lib,o.mt),bankBalanceAfter:o.solde});
+        await window.dbSet?.('ops',obj);
         count++;
       }
       toast(count+' opération(s) Crédit Agricole importée(s) ✓');
@@ -1766,7 +1767,8 @@ async function importOpsCSV(event){
       let mt = recette ? recette : (charge ? -Math.abs(charge) : numFR(r['montant signe']||r.montant));
       const type=(r.type||'').toLowerCase().includes('charge') || mt<0 ? 'charge' : 'recette';
       if(type==='charge') mt=-Math.abs(mt); else mt=Math.abs(mt);
-      await window.dbSet?.('ops',{id:Date.now()+count,date:r.date||new Date().toISOString().split('T')[0],lib:r.libelle||r['libellé']||'',bien:r.bien||'',cat:r.categorie||r['catégorie']||'Autre',type,payment:r.paiement||'',status:r.statut||'paye',docId:r['id justificatif']||'',mt});
+      const obj=applyAccountingRulesToOp({id:Date.now()+count,date:r.date||new Date().toISOString().split('T')[0],lib:r.libelle||r['libellé']||'',bien:r.bien||'',cat:r.categorie||r['catégorie']||'Autre',type,payment:r.paiement||'',status:r.statut||'paye',docId:r['id justificatif']||'',mt});
+      await window.dbSet?.('ops',obj);
       count++;
     }
     toast(count+' opération(s) importée(s) ✓');
@@ -1922,6 +1924,97 @@ function estimatedBankBalance(){
   const delta=(window.CACHE?.ops||[]).filter(o=>String(o.date||'')>refDate).reduce((s,o)=>s+(+o.mt||0),0);
   return {balance:(+ref.balance||0)+delta, ref, delta};
 }
+function defaultAccountingRules(){
+  return [
+    {id:'rule-vacherand',enabled:true,pattern:'VACHERAND',cat:'Charges de copropriété',status:'a_verifier',noDocRequired:false,payment:'Prélèvement'},
+    {id:'rule-allianz',enabled:true,pattern:'ALLIANZ',cat:'Assurance',status:'paye',noDocRequired:false,payment:'Prélèvement'},
+    {id:'rule-loyer',enabled:true,pattern:'LOYER',cat:'Loyer',status:'paye',noDocRequired:true,payment:'Virement'},
+    {id:'rule-frais-banque',enabled:true,pattern:'FRAIS BANCAIRE',cat:'Banque',status:'paye',noDocRequired:true,payment:'Crédit Agricole'},
+    {id:'rule-facture-ca',enabled:true,pattern:'FACTURE CRÉDIT AGRICOLE',cat:'Banque',status:'paye',noDocRequired:true,payment:'Crédit Agricole'}
+  ];
+}
+function accountingRulesRef(){
+  return (window.CACHE?.settings||[]).find(x=>String(x.id)==='accountingRules') || null;
+}
+function accountingRules(){
+  const saved=accountingRulesRef()?.rules;
+  return Array.isArray(saved) && saved.length ? saved : defaultAccountingRules();
+}
+function applyAccountingRulesToOp(op){
+  const source={...op};
+  const text=normalizeText([source.lib, source.sourceLabel, source.payment].join(' '));
+  const rule=accountingRules().find(r=>r && r.enabled!==false && normalizeText(r.pattern) && text.includes(normalizeText(r.pattern)));
+  if(!rule) return source;
+  const noDoc=!!rule.noDocRequired;
+  return {
+    ...source,
+    cat: rule.cat || source.cat,
+    status: rule.status || source.status,
+    payment: rule.payment || source.payment,
+    bien: rule.bien ?? source.bien,
+    docId: noDoc ? '' : (source.docId || ''),
+    noDocRequired: noDoc,
+    justificatifNotRequired: noDoc,
+    noDocReason: noDoc ? (rule.noDocReason || 'Règle automatique : justificatif bancaire suffisant') : (source.noDocReason || '')
+  };
+}
+let ACCOUNTING_RULE_DRAFTS = [];
+function openAccountingRulesModal(){
+  if(!canWrite()){ denyWrite(); return; }
+  ACCOUNTING_RULE_DRAFTS = accountingRules().map(r=>({...r}));
+  renderAccountingRulesEditor();
+  openModal('m-accounting-rules');
+}
+function addAccountingRuleDraft(){
+  ACCOUNTING_RULE_DRAFTS.push({id:'rule-'+Date.now(),enabled:true,pattern:'',cat:'À classer',status:'a_verifier',noDocRequired:false,payment:''});
+  renderAccountingRulesEditor();
+}
+function removeAccountingRuleDraft(id){
+  ACCOUNTING_RULE_DRAFTS = ACCOUNTING_RULE_DRAFTS.filter(r=>String(r.id)!==String(id));
+  renderAccountingRulesEditor();
+}
+function renderAccountingRulesEditor(){
+  const box=$('accounting-rules-list'); if(!box) return;
+  box.innerHTML=ACCOUNTING_RULE_DRAFTS.map((r,i)=>`<div class="rule-card" data-rule-id="${esc(r.id)}">
+    <label class="fg"><span>Actif</span><input type="checkbox" data-rule-field="enabled" ${r.enabled!==false?'checked':''}></label>
+    <div class="fg"><label>Texte reconnu</label><input type="text" data-rule-field="pattern" value="${esc(r.pattern||'')}" placeholder="Ex : VACHERAND"></div>
+    <div class="fg"><label>Catégorie</label><select data-rule-field="cat">${accountingRuleCategoryOptions(r.cat)}</select></div>
+    <div class="fg"><label>Justificatif</label><select data-rule-field="noDocRequired"><option value="false" ${!r.noDocRequired?'selected':''}>À demander</option><option value="true" ${r.noDocRequired?'selected':''}>OK bancaire</option></select></div>
+    <div class="fg"><label>Paiement</label><input type="text" data-rule-field="payment" value="${esc(r.payment||'')}" placeholder="Virement"></div>
+    <button class="rule-remove" type="button" onclick="removeAccountingRuleDraft('${esc(r.id)}')" title="Supprimer">×</button>
+  </div>`).join('') || '<p class="small-help">Aucune règle automatique pour le moment.</p>';
+}
+function accountingRuleCategoryOptions(selected){
+  const cats=isGFAContext()?['Fermage','Taxe foncière','MSA / charges agricoles','Entretien foncier','Travaux ruraux','Assurance','Frais notaire / SAFER','Honoraires','Autre GFA','À classer']:['Loyer','Charges de copropriété','Charges locatives','Taxe foncière','Assurance','Travaux','Honoraires','Banque','Autre','À classer'];
+  return cats.map(c=>`<option ${String(c)===String(selected)?'selected':''}>${esc(c)}</option>`).join('');
+}
+async function saveAccountingRulesFromModal(){
+  if(!canWrite()){ denyWrite(); return; }
+  const cards=[...document.querySelectorAll('#accounting-rules-list .rule-card')];
+  const rules=cards.map(card=>{
+    const get=f=>card.querySelector(`[data-rule-field="${f}"]`);
+    return {
+      id:card.dataset.ruleId || ('rule-'+Date.now()),
+      enabled:!!get('enabled')?.checked,
+      pattern:get('pattern')?.value.trim() || '',
+      cat:get('cat')?.value || 'À classer',
+      status:(get('cat')?.value || '')==='À classer'?'a_verifier':'paye',
+      noDocRequired:get('noDocRequired')?.value==='true',
+      payment:get('payment')?.value.trim() || ''
+    };
+  }).filter(r=>r.pattern);
+  const obj={id:'accountingRules',rules,updatedAt:new Date().toISOString()};
+  const ok=await saveWithFeedback(window.dbSet?.('settings',obj),'Règles automatiques enregistrées ✓');
+  if(ok){
+    const settings=window.CACHE?.settings;
+    if(Array.isArray(settings)){
+      const idx=settings.findIndex(x=>String(x.id)==='accountingRules');
+      if(idx>=0) settings[idx]={...settings[idx],...obj};
+      else settings.push(obj);
+    }
+    closeModal('m-accounting-rules');
+  }
+}
 function currentJournalFilters(){
   return {
     q: normalizeText($('journal-search')?.value||''),
@@ -1975,16 +2068,15 @@ function renderCompta(){
     const mt=+op.mt||0;
     const isCA=String(op.sourceBank||op.source||'').toLowerCase().includes('credit_agricole') || !!op.bankImportId;
     const verify=op.status==='a_verifier' || op.cat==='À classer';
-    return `<tr><td>${fmtDate(op.date)}</td><td>${esc(op.lib||'—')}${isCA?'<span class="bank-badge">CA</span>':''}${verify?'<span class="verify-badge">à vérifier</span>':''}</td>
-    <td style="color:var(--text2);font-size:12px">${esc(op.bien||'—')}</td>
-    <td><span class="tag ${mt>0?'tg':'tr'}">${esc(op.cat||'Autre')}</span></td>
+    return `<tr><td><span class="journal-date">${fmtDate(op.date)}</span></td>
+    <td class="journal-op-cell"><div class="journal-op-main">${esc(op.lib||'—')}</div><div class="journal-op-meta"><span class="journal-cat-pill">${esc(op.cat||'Autre')}</span>${isCA?'<span class="bank-badge">CA</span>':''}${verify?'<span class="verify-badge">à vérifier</span>':''}</div></td>
     <td>${op.docId?`<button class="btn-out btn-sm" onclick="event.stopPropagation();openStoredDoc(${op.docId})">Voir</button>`:(op.noDocRequired||op.justificatifNotRequired?`<button class="doc-status-btn doc-no-required" title="Cliquer pour remettre en justificatif manquant" onclick="event.stopPropagation();toggleNoDocRequired('${String(op.id)}')">OK · bancaire</button>`:`<button class="doc-status-btn doc-missing" title="Cliquer si aucun justificatif n'est nécessaire" onclick="event.stopPropagation();toggleNoDocRequired('${String(op.id)}')">Manquant</button>`)}</td>
-    <td class="${mt>0?'apos':'aneg'}">${mt>0?'+':'-'}${Math.abs(mt).toLocaleString('fr-FR')} €</td>
-    <td><div class="td-act">
+    <td class="${mt>0?'apos':'aneg'} journal-amount">${mt>0?'+':'-'}${Math.abs(mt).toLocaleString('fr-FR')} €</td>
+    <td><div class="journal-actions">
       <button class="ico-btn write-only" onclick="openOpModal('${String(op.id)}')">✏️</button>
       <button class="ico-btn write-only" onclick="confirmDel('op-direct','${String(op.id)}')">🗑</button>
     </div></td></tr>`;
-  }).join(''):'<tr><td colspan="7" style="color:var(--text2);text-align:center;padding:18px">Aucune opération ne correspond à la recherche ou aux filtres.</td></tr>';
+  }).join(''):'<tr><td colspan="5" style="color:var(--text2);text-align:center;padding:18px">Aucune opération ne correspond à la recherche ou aux filtres.</td></tr>';
   try{ renderComptable(); }catch(e){ console.warn('Préparation comptable non rendue', e); }
 }
 
@@ -2211,7 +2303,8 @@ async function importCreditAgricoleFile(event){
     if(!confirm(`${ops.length} opération(s) détectée(s).\nImporter ${newOps.length} nouvelle(s) opération(s) Crédit Agricole ?${ignored?`\n${ignored} doublon(s) ignoré(s).`:''}`)) return;
     let count=0;
     for(const o of newOps){
-      await window.dbSet?.('ops',{id:Date.now()+count,date:o.date,lib:o.lib,bien:'',cat:o.cat,type:o.type,payment:'Crédit Agricole',status:o.cat==='À classer'?'a_verifier':'paye',docId:'',mt:o.mt,sourceBank:'credit_agricole',sourceLabel:'Import Crédit Agricole CSV/XLS/XLSX',bankImportId:bankImportKey(o.date,o.lib,o.mt),bankBalanceAfter:o.solde});
+      const obj=applyAccountingRulesToOp({id:Date.now()+count,date:o.date,lib:o.lib,bien:'',cat:o.cat,type:o.type,payment:'Crédit Agricole',status:o.cat==='À classer'?'a_verifier':'paye',docId:'',mt:o.mt,sourceBank:'credit_agricole',sourceLabel:'Import Crédit Agricole CSV/XLS/XLSX',bankImportId:bankImportKey(o.date,o.lib,o.mt),bankBalanceAfter:o.solde});
+      await window.dbSet?.('ops',obj);
       count++;
     }
     toast(count+' opération(s) Crédit Agricole importée(s) ✓');
@@ -2470,7 +2563,8 @@ async function importCreditAgricolePdfPreviewRows(){
     if(!confirm(`Importer ${newOps.length} opération(s) depuis le relevé PDF ?${ignored?`\n${ignored} doublon(s) ignoré(s).`:''}`)) return;
     let count=0;
     for(const o of newOps){
-      await window.dbSet?.('ops',{id:Date.now()+count,date:o.date,lib:o.lib,bien:'',cat:o.cat,type:o.type,payment:'Crédit Agricole',status:String(o.cat||'').includes('À classer')?'a_verifier':'paye',docId:'',mt:o.mt,sourceBank:'credit_agricole',sourceLabel:'Import Crédit Agricole PDF V2.1',bankImportId:bankImportKey(o.date,o.lib,o.mt)});
+      const obj=applyAccountingRulesToOp({id:Date.now()+count,date:o.date,lib:o.lib,bien:'',cat:o.cat,type:o.type,payment:'Crédit Agricole',status:String(o.cat||'').includes('À classer')?'a_verifier':'paye',docId:'',mt:o.mt,sourceBank:'credit_agricole',sourceLabel:'Import Crédit Agricole PDF V2.1',bankImportId:bankImportKey(o.date,o.lib,o.mt)});
+      await window.dbSet?.('ops',obj);
       count++;
     }
     closeModal('m-ca-pdf-import');
@@ -2724,7 +2818,7 @@ async function saveAssoc(){
 function setOpCategories(){
   const cat=$('op-cat'); if(!cat) return;
   if(isGFAContext()) cat.innerHTML='<option>Fermage</option><option>Taxe foncière</option><option>MSA / charges agricoles</option><option>Entretien foncier</option><option>Travaux ruraux</option><option>Assurance</option><option>Frais notaire / SAFER</option><option>Honoraires</option><option>Autre GFA</option>';
-  else cat.innerHTML='<option>Loyer</option><option>Charges locatives</option><option>Taxe foncière</option><option>Assurance</option><option>Travaux</option><option>Honoraires</option><option>Autre</option>';
+  else cat.innerHTML='<option>Loyer</option><option>Charges de copropriété</option><option>Charges locatives</option><option>Taxe foncière</option><option>Assurance</option><option>Travaux</option><option>Honoraires</option><option>Banque</option><option>Autre</option><option>À classer</option>';
 }
 function openOpModal(id){
   setOpCategories();
