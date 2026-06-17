@@ -1739,7 +1739,25 @@ async function importOpsCSV(event){
   const file=event.target.files?.[0]; event.target.value='';
   if(!file) return; if(!canWrite()){ denyWrite(); return; }
   try{
-    const rows=parseCSVText(await readTextFile(file));
+    const text=await readTextFile(file);
+    const matrix=parseDelimitedRows(text);
+    if(findHeaderIndex(matrix)>=0){
+      const ops=buildOpsFromCreditAgricoleRows(matrix, new Date().getFullYear());
+      if(!ops.length){ toast('Aucune opération Crédit Agricole détectée'); return; }
+      const keys=existingBankKeys();
+      const newOps=ops.filter(o=>!keys.has(bankImportKey(o.date,o.lib,o.mt)));
+      const ignored=ops.length-newOps.length;
+      if(!newOps.length){ toast('Aucune nouvelle opération : doublons ignorés'); return; }
+      if(!confirm(`${ops.length} opération(s) Crédit Agricole détectée(s).\nImporter ${newOps.length} nouvelle(s) opération(s) ?${ignored?`\n${ignored} doublon(s) ignoré(s).`:''}`)) return;
+      let count=0;
+      for(const o of newOps){
+        await window.dbSet?.('ops',{id:Date.now()+count,date:o.date,lib:o.lib,bien:'',cat:o.cat,type:o.type,payment:'Crédit Agricole',status:o.cat==='À classer'?'a_verifier':'paye',docId:'',mt:o.mt,sourceBank:'credit_agricole',sourceLabel:'Import Crédit Agricole CSV',bankImportId:bankImportKey(o.date,o.lib,o.mt),bankBalanceAfter:o.solde});
+        count++;
+      }
+      toast(count+' opération(s) Crédit Agricole importée(s) ✓');
+      return;
+    }
+    const rows=parseCSVText(text);
     if(!rows.length){ toast('CSV vide'); return; }
     if(!confirm('Importer '+rows.length+' opération(s) dans la comptabilité ?')) return;
     let count=0;
@@ -2125,27 +2143,34 @@ function readArrayBufferFile(file){ return new Promise((res,rej)=>{const r=new F
 function findHeaderIndex(rows){
   return rows.findIndex(row=>{
     const h=row.map(normalizeText).join(' | ');
-    return h.includes('date') && h.includes('libelle') && (h.includes('debit') || h.includes('credit'));
+    const hasDate=h.includes('date');
+    const hasLib=h.includes('libell') || h.includes('intitule') || h.includes('description');
+    const hasAmount=h.includes('debit') || h.includes('credit') || h.includes('montant') || h.includes('amount');
+    return hasDate && hasLib && hasAmount;
   });
 }
 function headerMap(headers){
   const map={};
   headers.forEach((h,i)=>{
     const n=normalizeText(h);
-    if(n.includes('date ope') || n==='date' || n.includes('operation')) map.date=i;
+    if(n==='date' || n.includes('date ope') || n.includes('date operation') || n.includes('date compta')) map.date=i;
     if(n.includes('date valeur')) map.dateValeur=i;
-    if(n.includes('libelle')) map.lib=i;
+    if(n.includes('libell') || n.includes('intitule') || n.includes('description')) map.lib=i;
     if(n.includes('debit')) map.debit=i;
     if(n.includes('credit')) map.credit=i;
+    if(n.includes('montant') || n.includes('amount')) map.montant=i;
     if(n.includes('solde')) map.solde=i;
   });
   return map;
 }
 function buildOpsFromCreditAgricoleRows(rows, year){
   const idx=findHeaderIndex(rows);
-  if(idx<0) throw new Error('Colonnes Crédit Agricole non reconnues. Attendu : Date, Libellé, Débit, Crédit, Solde.');
+  if(idx<0) throw new Error('Colonnes Crédit Agricole non reconnues. Attendu : Date, Libellé, puis Débit/Crédit ou Montant.');
   const headers=rows[idx];
   const map=headerMap(headers);
+  if(map.date==null || map.lib==null || (map.debit==null && map.credit==null && map.montant==null)){
+    throw new Error('Colonnes Crédit Agricole incomplètes. Vérifie que le fichier contient Date, Libellé et Montant ou Débit/Crédit.');
+  }
   const out=[];
   for(const row of rows.slice(idx+1)){
     const rawLib=String(row[map.lib]??'').replace(/\r?\n+/g,' ').replace(/\s+/g,' ').trim();
@@ -2156,8 +2181,9 @@ function buildOpsFromCreditAgricoleRows(rows, year){
     if(!date) continue;
     const debit=numFR(row[map.debit]);
     const credit=numFR(row[map.credit]);
-    if(!debit && !credit) continue;
-    const mt=credit ? Math.abs(credit) : -Math.abs(debit);
+    const signedAmount=map.montant!=null ? numFR(row[map.montant]) : 0;
+    if(!debit && !credit && !signedAmount) continue;
+    const mt=credit ? Math.abs(credit) : (debit ? -Math.abs(debit) : signedAmount);
     const cat=classifyBankOperation(rawLib, mt);
     out.push({date,lib:rawLib,mt,type:mt<0?'charge':'recette',cat,solde:map.solde!=null?numFR(row[map.solde]):null});
   }
