@@ -5115,3 +5115,25 @@ async function refreshAssocPartsOnStructureCards(scis){
     }
   };
 })();
+
+// Structures: force l'affichage des parts depuis Vie de la SCI > Associes.
+(function(){
+  function rerenderStructureShares(){
+    if(typeof window.renderMesSCIs === 'function') window.renderMesSCIs();
+  }
+  const oldGoPage = window.goPage;
+  if(typeof oldGoPage === 'function' && !window.__sharesGoPagePatched){
+    window.__sharesGoPagePatched = true;
+    window.goPage = function(id){
+      const result = oldGoPage.apply(this, arguments);
+      if(id === 'mes-scis') setTimeout(rerenderStructureShares, 80);
+      return result;
+    };
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(function(){
+      const active = document.getElementById('page-mes-scis');
+      if(active && active.classList.contains('active')) rerenderStructureShares();
+    }, 900);
+  });
+})();
