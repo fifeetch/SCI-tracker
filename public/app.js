@@ -3585,7 +3585,7 @@ async function deleteDocChunks(id){
     if(count>0) await batch.commit();
   }catch(err){ console.warn('Chunks document non supprimés',err); }
 }
-function dataUrlToBlobUrl(dataUrl){
+function dataUrlToBlob(dataUrl){
   const parts=String(dataUrl||'').split(',');
   if(parts.length<2) throw new Error('Format document invalide');
   const mimeMatch=parts[0].match(/data:([^;]+);base64/);
@@ -3594,7 +3594,37 @@ function dataUrlToBlobUrl(dataUrl){
   const len=bin.length;
   const arr=new Uint8Array(len);
   for(let i=0;i<len;i++) arr[i]=bin.charCodeAt(i);
-  return URL.createObjectURL(new Blob([arr],{type:mime}));
+  return new Blob([arr],{type:mime});
+}
+function dataUrlToBlobUrl(dataUrl){
+  return URL.createObjectURL(dataUrlToBlob(dataUrl));
+}
+let DOC_VIEWER_URL='';
+function closeDocViewer(){
+  closeModal('m-doc-viewer');
+  const body=$('doc-viewer-body');
+  if(body) body.innerHTML='<div class="doc-viewer-loading">Chargement du document...</div>';
+  if(DOC_VIEWER_URL){ URL.revokeObjectURL(DOC_VIEWER_URL); DOC_VIEWER_URL=''; }
+}
+async function renderPdfInViewer(blob, body){
+  if(!window.pdfjsLib) throw new Error('Bibliothèque PDF non chargée. Recharge la page puis réessaie.');
+  try{ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){}
+  const buffer=await blob.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buffer)}).promise;
+  body.innerHTML='';
+  for(let pageNum=1; pageNum<=pdf.numPages; pageNum++){
+    const page=await pdf.getPage(pageNum);
+    const baseViewport=page.getViewport({scale:1});
+    const maxWidth=Math.max(280, Math.min(body.clientWidth-20, 920));
+    const scale=Math.min(2.2, maxWidth/baseViewport.width);
+    const viewport=page.getViewport({scale});
+    const canvas=document.createElement('canvas');
+    canvas.className='doc-pdf-page';
+    canvas.width=Math.floor(viewport.width);
+    canvas.height=Math.floor(viewport.height);
+    await page.render({canvasContext:canvas.getContext('2d'), viewport}).promise;
+    body.appendChild(canvas);
+  }
 }
 async function getStoredDocDataUrl(id){
   const d=(window.CACHE?.docs||[]).find(x=>x.id===id);
@@ -3630,26 +3660,33 @@ async function openStoredDoc(id){
   const d=(window.CACHE?.docs||[]).find(x=>x.id===id);
   if(!d){toast('Document introuvable');return;}
   if(d.fileUrl){ window.open(d.fileUrl,'_blank'); return; }
-  const w=window.open('', '_blank');
-  if(!w){toast('Ouverture bloquée par le navigateur');return;}
-  w.document.write('<body style="font-family:Arial;padding:30px">Chargement du document...</body>');
+  const body=$('doc-viewer-body'), title=$('doc-viewer-title'), sub=$('doc-viewer-subtitle');
+  const openBtn=$('doc-viewer-open-btn'), dlBtn=$('doc-viewer-download-btn');
+  if(!body){ await downloadStoredDoc(id); return; }
+  if(DOC_VIEWER_URL){ URL.revokeObjectURL(DOC_VIEWER_URL); DOC_VIEWER_URL=''; }
+  if(title) title.textContent=d.name||'Document';
+  if(sub) sub.textContent=[d.type||'Document', d.mime||''].filter(Boolean).join(' · ');
+  body.innerHTML='<div class="doc-viewer-loading">Chargement du document...</div>';
+  openModal('m-doc-viewer');
   try{
     let dataUrl=await getStoredDocDataUrl(id);
-    if(!dataUrl){ w.close(); toast('Ancien document : fichier non enregistré. Réimporte-le une fois pour le rendre consultable.'); return; }
-    const blobUrl=dataUrlToBlobUrl(dataUrl);
+    if(!dataUrl){ closeDocViewer(); toast('Ancien document : fichier non enregistré. Réimporte-le une fois pour le rendre consultable.'); return; }
+    const blob=dataUrlToBlob(dataUrl);
+    const blobUrl=URL.createObjectURL(blob);
+    DOC_VIEWER_URL=blobUrl;
     const safeName=esc(d.name||'Document');
-    w.document.open();
+    if(openBtn) openBtn.onclick=()=>window.open(blobUrl,'_blank');
+    if(dlBtn) dlBtn.onclick=()=>downloadStoredDoc(id);
     if(String(d.mime||'').startsWith('image/')){
-      w.document.write(`<title>${safeName}</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${blobUrl}" style="max-width:100%;max-height:100vh;object-fit:contain"><script>window.addEventListener('beforeunload',()=>URL.revokeObjectURL('${blobUrl}'));<\/script></body>`);
+      body.innerHTML=`<img class="doc-viewer-img" src="${blobUrl}" alt="${safeName}">`;
     }else if(String(d.mime||'').includes('pdf') || String(d.name||'').toLowerCase().endsWith('.pdf')){
-      w.document.write(`<title>${safeName}</title><body style="margin:0"><iframe src="${blobUrl}" style="border:0;width:100%;height:100vh"></iframe><div style="position:fixed;right:16px;bottom:16px"><a href="${blobUrl}" download="${safeName}" style="background:#c9a84c;color:#111;padding:10px 14px;border-radius:10px;text-decoration:none;font-family:Arial">Télécharger</a></div><script>window.addEventListener('beforeunload',()=>URL.revokeObjectURL('${blobUrl}'));<\/script></body>`);
+      await renderPdfInViewer(blob, body);
     }else{
-      w.location.href=blobUrl;
+      body.innerHTML='<div class="doc-viewer-loading">Ce type de fichier ne se prévisualise pas ici. Utilise Ouvrir ou Télécharger.</div>';
     }
-    w.document.close();
   }catch(err){
     console.error('Erreur consultation document',err);
-    w.close();
+    if(body) body.innerHTML='<div class="doc-viewer-error">Impossible d’ouvrir le document : '+esc(err.message||err)+'</div>';
     toast('Impossible d’ouvrir le document : '+(err.message||err));
   }
 }

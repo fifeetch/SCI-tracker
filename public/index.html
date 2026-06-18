@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260618-quittance-options">
+<link rel="stylesheet" href="styles.css?v=20260618-doc-viewer">
 <!-- ══ FIREBASE CDN — chargé en premier dans le head ══ -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -1526,6 +1526,26 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Consultation document -->
+<div class="modal-overlay" id="m-doc-viewer">
+  <div class="modal doc-viewer-modal">
+    <div class="doc-viewer-head">
+      <div>
+        <h3 id="doc-viewer-title">Document</h3>
+        <p id="doc-viewer-subtitle">Consultation</p>
+      </div>
+      <button class="btn-out" type="button" onclick="closeDocViewer()">Fermer</button>
+    </div>
+    <div class="doc-viewer-actions">
+      <button class="btn" type="button" id="doc-viewer-open-btn">Ouvrir dans le navigateur</button>
+      <button class="btn-out" type="button" id="doc-viewer-download-btn">Télécharger</button>
+    </div>
+    <div class="doc-viewer-body" id="doc-viewer-body">
+      <div class="doc-viewer-loading">Chargement du document...</div>
+    </div>
+  </div>
+</div>
+
 <!-- Barre de navigation bas de page -->
 <nav class="mobile-nav">
   <div class="mobile-nav-inner">
@@ -1554,7 +1574,7 @@
 </nav>
 
 <!-- Firebase SDK déplacé dans le <head> -->
-<script src="app.js?v=20260618-quittance-options"></script>
+<script src="app.js?v=20260618-doc-viewer"></script>
 
 <!-- ══ APP — script classique, scope global ══ -->
 
