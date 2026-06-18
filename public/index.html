@@ -628,7 +628,8 @@
   </div>
   <div class="comm-layout">
     <div class="comm-channels">
-      <button class="channel-btn active" data-channel="general" onclick="selectChannel('general',this)">📢 Général</button>
+      <button class="channel-btn active" data-channel="all" onclick="selectChannel('all',this)">💬 Tous</button>
+      <button class="channel-btn" data-channel="general" onclick="selectChannel('general',this)">📢 Général</button>
       <button class="channel-btn" data-channel="compta" onclick="selectChannel('compta',this)">💰 Comptabilité</button>
       <button class="channel-btn" data-channel="travaux" onclick="selectChannel('travaux',this)">🔧 Travaux</button>
       <button class="channel-btn" data-channel="biens" onclick="selectChannel('biens',this)">🏠 Biens</button>
@@ -638,7 +639,13 @@
       <div class="message-box">
         <textarea id="msg-text" rows="3" placeholder="Écrire un message aux associés..."></textarea>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px">
-          <span id="msg-channel-label" class="tag tb">Général</span>
+          <select id="msg-channel-compose" class="msg-channel-compose">
+            <option value="general">📢 Général</option>
+            <option value="compta">💰 Comptabilité</option>
+            <option value="travaux">🔧 Travaux</option>
+            <option value="biens">🏠 Biens</option>
+            <option value="reunions">📅 Réunions</option>
+          </select>
           <button class="btn" onclick="sendMessage()">Envoyer</button>
         </div>
       </div>

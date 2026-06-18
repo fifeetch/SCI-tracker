@@ -860,6 +860,9 @@
   .push-preferences{display:grid;gap:8px;margin:12px 0 2px;}
   .push-pref-row{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--text);cursor:pointer;}
   .push-pref-row input{width:16px;height:16px;accent-color:var(--v2-mint);}
+  .channel-count{float:right;min-width:22px;text-align:center;background:rgba(31,157,133,.12);border:1px solid rgba(31,157,133,.20);border-radius:999px;padding:1px 7px;font-size:11px;font-weight:900;color:var(--v2-mint);}
+  .channel-btn.active .channel-count{background:rgba(31,157,133,.22);color:var(--green);}
+  .msg-channel-compose{min-width:170px;background:var(--inp);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;}
   @media(max-width:1100px){.settings-hub{grid-template-columns:repeat(2,minmax(0,1fr));}.settings-tile{min-height:118px;}}
   @media(max-width:900px){.settings-export-actions{grid-template-columns:1fr}.settings-export-action{min-height:auto}.settings-export-csv{grid-template-columns:1fr}.settings-export-csv .btn-out{width:100%;}}
   @media(max-width:640px){.settings-hub{grid-template-columns:1fr}.settings-tile{min-height:auto}.settings-detail-head{padding:16px;border-radius:18px}.settings-grid{grid-template-columns:1fr;}}

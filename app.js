@@ -3431,8 +3431,8 @@ async function genQuittance(nom,loyer,charges,bienLoué=''){
 }
 
 // ══ COMMUNICATION / DÉCISIONS ══
-let currentChannel='general';
-const CHANNEL_LABELS={general:'Général',compta:'Comptabilité',travaux:'Travaux',biens:'Biens',reunions:'Réunions'};
+let currentChannel='all';
+const CHANNEL_LABELS={all:'Tous',general:'Général',compta:'Comptabilité',travaux:'Travaux',biens:'Biens',reunions:'Réunions'};
 function esc(s){return String(s??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
 function docTypeLabel(t){
   const labels={bail_rural:'Bail rural',cadastre:'Cadastre',acte_propriete:'Acte de propriété',safer:'SAFER',taxe_fonciere:'Taxe foncière',fermage:'Fermage',facture:'Facture',contrat:'Contrat',diagnostic:'Diagnostic',photo:'Photo',autre:'Autre'};
@@ -3562,7 +3562,8 @@ function selectChannel(ch,btn){
   currentChannel=ch;
   document.querySelectorAll('.channel-btn').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
-  const lab=$('msg-channel-label'); if(lab) lab.textContent=CHANNEL_LABELS[ch]||ch;
+  const compose=$('msg-channel-compose');
+  if(compose && ch && ch!=='all') compose.value=ch;
   renderCommunication();
 }
 async function addActivity(type, action){
@@ -3600,17 +3601,18 @@ async function notifyManagers(type, refId, title, text, mailSubject, mailBody){
 async function sendMessage(){
   const txt=(v('msg-text')||'').trim();
   if(!txt){toast('Message vide');return;}
+  const composeChannel=$('msg-channel-compose')?.value || (currentChannel==='all'?'general':currentChannel);
   try{
-    const ref=await colRef('messages').add({channel:currentChannel,authorUid:auth.currentUser?.uid||'',authorName:currentUserName(),authorPhoto:profilePhotoUrl(),role:APP_STATE.role,message:txt,createdAt:firebase.firestore.FieldValue.serverTimestamp(),readBy:[auth.currentUser?.uid||'']});
+    const ref=await colRef('messages').add({channel:composeChannel,authorUid:auth.currentUser?.uid||'',authorName:currentUserName(),authorPhoto:profilePhotoUrl(),role:APP_STATE.role,message:txt,createdAt:firebase.firestore.FieldValue.serverTimestamp(),readBy:[auth.currentUser?.uid||'']});
     sv('msg-text','');
     await addActivity('message', currentUserName()+' a publié un message');
     await notifyManagers(
       'message',
       ref.id,
       'Nouveau message',
-      (CHANNEL_LABELS[currentChannel]||currentChannel)+' · '+currentUserName()+' : '+txt.slice(0,120),
+      (CHANNEL_LABELS[composeChannel]||composeChannel)+' · '+currentUserName()+' : '+txt.slice(0,120),
       'Nouveau message SCI Family',
-      `Bonjour,\n\nUn nouveau message a été publié dans SCI Family.\n\nCanal : ${CHANNEL_LABELS[currentChannel]||currentChannel}\nAuteur : ${currentUserName()}\nMessage :\n${txt}\n\nLien : https://sci-family-ab82c.web.app\n`
+      `Bonjour,\n\nUn nouveau message a été publié dans SCI Family.\n\nCanal : ${CHANNEL_LABELS[composeChannel]||composeChannel}\nAuteur : ${currentUserName()}\nMessage :\n${txt}\n\nLien : https://sci-family-ab82c.web.app\n`
     );
     toast('Message envoyé ✓');
   }catch(err){console.error(err);toast(formatFirebaseError(err));}
@@ -3660,7 +3662,16 @@ function msgAvatarHtml(m){
   return `<span class="msg-avatar">${photo?`<img src="${esc(photo)}" alt="${esc(name)}">`:esc(initials)}</span>`;
 }
 function renderCommunication(){
-  const list=(window.CACHE?.messages||[]).filter(m=>m.channel===currentChannel).sort((a,b)=>tsMillis(b.createdAt)-tsMillis(a.createdAt));
+  const allMessages=window.CACHE?.messages||[];
+  document.querySelectorAll('.channel-btn[data-channel]').forEach(btn=>{
+    const ch=btn.dataset.channel;
+    const count=ch==='all' ? allMessages.length : allMessages.filter(m=>(m.channel||'general')===ch).length;
+    const base=btn.dataset.baseLabel || btn.textContent.replace(/\s+\d+$/,'');
+    btn.dataset.baseLabel=base;
+    btn.innerHTML=`${esc(base)} <span class="channel-count">${count}</span>`;
+    btn.classList.toggle('active', ch===currentChannel);
+  });
+  const list=allMessages.filter(m=>currentChannel==='all' || (m.channel||'general')===currentChannel).sort((a,b)=>tsMillis(b.createdAt)-tsMillis(a.createdAt));
   const el=$('messages-list'); if(!el)return;
   el.innerHTML=list.length?list.map((m,i)=>{
     const id=String(m.id||('msg'+i));
