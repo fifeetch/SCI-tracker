@@ -1321,51 +1321,53 @@ header{max-width:100vw;}
 
 /* Grands écrans : 2/3 modules + 1/3 dashboard */
 @media (min-width:1501px){
-  #page-home{max-width:1500px!important;padding-left:36px!important;padding-right:36px!important;}
-  .home-layout-v32{grid-template-columns:minmax(0,2.05fr) minmax(360px,.82fr)!important;gap:22px!important;}
+  #page-home{max-width:1700px!important;padding-left:42px!important;padding-right:42px!important;}
+  .home-layout-v32{grid-template-columns:minmax(0,2.1fr) minmax(390px,.85fr)!important;gap:28px!important;}
   .home-main-v32 .tiles{grid-template-columns:repeat(4,minmax(0,1fr))!important;}
+  .home-main-v32 .tile{min-height:184px!important;}
+  .home-sidebar-v32 .home-kpi-hero,.home-sidebar-v32 .home-visual-panel{padding:24px!important;}
 }
 
-/* MacBook Air / portables 13-14 pouces : conserver la colonne droite mais compacter */
+/* PC / portables 13-14 pouces : conserver une vraie taille de lecture */
 @media (min-width:1251px) and (max-width:1500px){
-  header{padding:12px 18px!important;gap:12px!important;}
-  .logo{min-width:210px!important;}
-  .logo h1#active-structure-title{font-size:18px!important;max-width:150px!important;}
-  header nav.main-nav-general{gap:4px!important;padding:3px!important;}
-  header nav.main-nav-general button{font-size:12px!important;padding:8px 8px!important;}
-  .hdr-right .sci-switcher{min-width:178px!important;max-width:205px!important;}
-  #page-home{max-width:100%!important;padding:22px 22px 44px!important;}
-  .greeting{margin-bottom:16px!important;}
-  .greeting h2{font-size:24px!important;}
-  .home-layout-v32{grid-template-columns:minmax(0,1.62fr) minmax(330px,.78fr)!important;gap:16px!important;}
-  .home-main-v32{gap:14px!important;}
-  .home-section-label{margin:8px 0 10px!important;}
-  .home-main-v32 .tiles{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important;}
-  .home-main-v32 .tile{min-height:148px!important;padding:18px 14px!important;}
-  .home-main-v32 .tile-icon{width:58px!important;height:50px!important;margin-bottom:8px!important;}
-  .home-main-v32 .v2-icon{width:56px!important;height:56px!important;}
-  .home-main-v32 .tile h3{font-size:13px!important;line-height:1.18!important;}
-  .home-main-v32 .tile p{font-size:11px!important;line-height:1.25!important;}
-  .home-sidebar-v32{top:78px!important;gap:14px!important;}
-  .home-sidebar-v32 .home-kpi-hero,.home-sidebar-v32 .home-visual-panel{padding:15px!important;border-radius:20px!important;}
-  .home-sidebar-v32 .home-kpi-head{margin-bottom:10px!important;}
-  .home-sidebar-v32 .home-kpi-eyebrow{font-size:9px!important;letter-spacing:.9px!important;}
-  .home-sidebar-v32 .home-kpi-head h3{font-size:17px!important;}
-  .home-sidebar-v32 .home-kpi-head p{display:none!important;}
-  .home-sidebar-v32 .kpi-config-btn{font-size:11px!important;padding:7px 9px!important;}
-  .home-sidebar-v32 .home-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;}
-  .home-sidebar-v32 .home-kpi-card{min-height:82px!important;padding:10px!important;border-radius:16px!important;}
-  .home-sidebar-v32 .home-kpi-card .k-icon{width:28px!important;height:28px!important;font-size:14px!important;}
-  .home-sidebar-v32 .home-kpi-card strong{font-size:16px!important;margin-top:6px!important;}
-  .home-sidebar-v32 .home-kpi-card span{font-size:10px!important;}
-  .home-sidebar-v32 .home-kpi-card small{display:none!important;}
-  .home-sidebar-v32 .home-chart-card{padding:12px!important;border-radius:16px!important;}
-  .mini-chart-row{grid-template-columns:92px minmax(0,1fr)!important;gap:10px!important;}
-  .mini-donut{width:88px!important;height:88px!important;}
-  .mini-donut::after{inset:20px!important;}
-  .mini-legend div{font-size:10.5px!important;}
-  .home-wide-panels{gap:14px!important;}
-  .home-mini-panel{padding:15px!important;border-radius:20px!important;}
+  header{padding:14px 24px!important;gap:14px!important;}
+  .logo{min-width:220px!important;}
+  .logo h1#active-structure-title{font-size:20px!important;max-width:170px!important;}
+  header nav.main-nav-general{gap:5px!important;padding:4px!important;}
+  header nav.main-nav-general button{font-size:13px!important;padding:8px 9px!important;}
+  .hdr-right .sci-switcher{min-width:185px!important;max-width:220px!important;}
+  #page-home{max-width:1380px!important;padding:34px 32px 54px!important;}
+  .greeting{margin-bottom:22px!important;}
+  .greeting h2{font-size:30px!important;}
+  .home-layout-v32{grid-template-columns:minmax(0,1.85fr) minmax(350px,.9fr)!important;gap:22px!important;}
+  .home-main-v32{gap:18px!important;}
+  .home-section-label{margin:12px 0 14px!important;}
+  .home-main-v32 .tiles{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:18px!important;}
+  .home-main-v32 .tile{min-height:172px!important;padding:24px 18px!important;}
+  .home-main-v32 .tile-icon{width:74px!important;height:62px!important;margin-bottom:12px!important;}
+  .home-main-v32 .v2-icon{width:70px!important;height:70px!important;}
+  .home-main-v32 .tile h3{font-size:15px!important;line-height:1.2!important;}
+  .home-main-v32 .tile p{font-size:12px!important;line-height:1.35!important;}
+  .home-sidebar-v32{top:88px!important;gap:18px!important;}
+  .home-sidebar-v32 .home-kpi-hero,.home-sidebar-v32 .home-visual-panel{padding:20px!important;border-radius:24px!important;}
+  .home-sidebar-v32 .home-kpi-head{margin-bottom:14px!important;}
+  .home-sidebar-v32 .home-kpi-eyebrow{font-size:10px!important;letter-spacing:1px!important;}
+  .home-sidebar-v32 .home-kpi-head h3{font-size:21px!important;}
+  .home-sidebar-v32 .home-kpi-head p{display:block!important;font-size:12px!important;}
+  .home-sidebar-v32 .kpi-config-btn{font-size:12px!important;padding:8px 10px!important;}
+  .home-sidebar-v32 .home-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;}
+  .home-sidebar-v32 .home-kpi-card{min-height:96px!important;padding:12px!important;border-radius:18px!important;}
+  .home-sidebar-v32 .home-kpi-card .k-icon{width:32px!important;height:32px!important;font-size:16px!important;}
+  .home-sidebar-v32 .home-kpi-card strong{font-size:19px!important;margin-top:8px!important;}
+  .home-sidebar-v32 .home-kpi-card span{font-size:11px!important;}
+  .home-sidebar-v32 .home-kpi-card small{display:block!important;font-size:10px!important;}
+  .home-sidebar-v32 .home-chart-card{padding:15px!important;border-radius:20px!important;}
+  .mini-chart-row{grid-template-columns:110px minmax(0,1fr)!important;gap:12px!important;}
+  .mini-donut{width:106px!important;height:106px!important;}
+  .mini-donut::after{inset:24px!important;}
+  .mini-legend div{font-size:12px!important;}
+  .home-wide-panels{gap:18px!important;}
+  .home-mini-panel{padding:20px!important;border-radius:22px!important;}
 }
 
 /* Petits portables / iPad horizontal : dashboard sous les modules */
