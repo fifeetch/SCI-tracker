@@ -4404,6 +4404,46 @@ document.addEventListener('DOMContentLoaded',()=>{
   var oldRenderAgs=window.renderAgs;
   if(typeof oldRenderAgs==='function') window.renderAgs=function(){ oldRenderAgs.apply(this,arguments); setTimeout(window.updateVieSciVisualKpis,0); };
   document.addEventListener('DOMContentLoaded',function(){setTimeout(window.updateVieSciVisualKpis,600);});
+// Correction affichage structures : les parts affichees viennent uniquement
+// de Vie de la SCI > Associes, donc scis/{sciId}/associes[].parts.
+window.renderMesSCIs=function renderMesSCIs(){
+  renderSCISwitcher();
+  const scis=APP_STATE.scis||[];
+  const set=(id,val)=>{const el=$(id);if(el)el.textContent=val;};
+  set('ms-scis', scis.length);
+  set('ms-role', APP_STATE.role==='gerant'?'Gerant':'Associe');
+  set('ms-current', APP_STATE.currentSCI?.nom || SCI_ID);
+  const box=$('sci-cards'); if(!box) return;
+  box.innerHTML=scis.length?scis.map((sci,i)=>{
+    const active=sci.sciId===SCI_ID;
+    const role=String(sci.role||'associe').toLowerCase();
+    return `<div class="sci-card ${active?'active':''}" onclick="selectSCI('${esc(sci.sciId)}')">
+      <div class="sci-name">${esc(sci.nom||sci.sciId)}</div>
+      <div class="sci-meta">Espace donnees : <strong>scis/${esc(sci.sciId)}</strong></div>
+      <div class="sci-meta">Parts renseignees : <strong id="sci-assoc-parts-${i}">chargement...</strong></div>
+      <span class="sci-role ${role==='gerant'?'gerant':''}">${role==='gerant'?'Gerant':'Associe'}</span>
+      <div class="sci-actions"><button class="btn-out btn-sm" type="button">${active?'Ouverte':'Ouvrir'}</button></div>
+    </div>`;
+  }).join(''):'<p style="color:var(--text2);padding:20px">Aucune SCI liee a ce compte.</p>';
+  refreshAssocPartsOnStructureCards(scis);
+};
+async function refreshAssocPartsOnStructureCards(scis){
+  if(!db || !Array.isArray(scis)) return;
+  await Promise.all(scis.map(async (sci,i)=>{
+    const el=$('sci-assoc-parts-'+i);
+    const sciId=String(sci.sciId||'').trim();
+    if(!el || !sciId) return;
+    try{
+      const snap=await db.collection('scis').doc(sciId).collection('associes').get({source:'server'});
+      let total=0;
+      snap.forEach(doc=>{ total += Math.max(0, +(doc.data()?.parts||0)); });
+      el.textContent=(Number.isInteger(total)?String(total):total.toFixed(2).replace('.',','))+'%';
+    }catch(err){
+      console.warn('Parts associes non lues', sciId, err);
+      el.textContent='non lu';
+    }
+  }));
+}
 })();
 
 /* Inline script 4 id="vie-sci-export-ajouts-minimaux" */
