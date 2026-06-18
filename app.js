@@ -3419,32 +3419,121 @@ function legalLine(label, value){ return value ? `<div class="legal-line"><span>
 function genQuittanceFromLoc(locId){
   const loc=(window.CACHE?.locataires||[]).find(x=>String(x.id)===String(locId));
   if(!loc){ toast('Locataire introuvable pour générer la quittance.'); return; }
-  const nom=[loc.prenom,loc.nom].filter(Boolean).join(' ') || 'Locataire';
-  genQuittance(nom, loc.loyer, loc.charges, loc.bien || '');
+  openQuittanceOptions(loc);
 }
-async function genQuittance(nom,loyer,charges,bienLoué=''){
-  const mois=new Date().toLocaleString('fr-FR',{month:'long',year:'numeric'});
-  const total=(+loyer||0)+(+charges||0);
+
+function euro(n){ return (+n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
+function isoToday(){ return new Date().toISOString().slice(0,10); }
+function currentMonthValue(){ return new Date().toISOString().slice(0,7); }
+function monthBounds(monthValue){
+  const raw=monthValue || currentMonthValue();
+  const [y,m]=raw.split('-').map(Number);
+  const start=new Date(y,m-1,1), end=new Date(y,m,0);
+  return {start:start.toISOString().slice(0,10), end:end.toISOString().slice(0,10)};
+}
+function formatLongDate(iso){
+  if(!iso) return '—';
+  const [y,m,d]=String(iso).split('-').map(Number);
+  if(!y||!m||!d) return fmtDate(iso);
+  return new Date(y,m-1,d).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+}
+function getPreparedQuittanceData(){
+  const loc=(window.CACHE?.locataires||[]).find(x=>String(x.id)===String(v('quit-loc-id')));
+  const rent=+v('quit-rent')||0, charges=+v('quit-charges')||0, adjust=+v('quit-adjust')||0;
+  const mode=v('quit-period-mode')||'month';
+  const bounds=mode==='month'?monthBounds(v('quit-month')):{start:v('quit-start'),end:v('quit-end')};
+  const start=bounds.start, end=bounds.end;
+  const period=mode==='month'
+    ? new Date(Number((v('quit-month')||currentMonthValue()).slice(0,4)), Number((v('quit-month')||currentMonthValue()).slice(5,7))-1, 1).toLocaleString('fr-FR',{month:'long',year:'numeric'})
+    : `du ${formatLongDate(start)} au ${formatLongDate(end)}`;
+  const locName=loc ? ([loc.prenom,loc.nom].filter(Boolean).join(' ') || 'Locataire') : (document.getElementById('quit-loc-name')?.textContent || 'Locataire');
+  return {
+    loc,
+    locName,
+    bien:loc?.bien || document.getElementById('quit-loc-bien')?.textContent || '',
+    rent, charges, adjust, total:rent+charges+adjust,
+    start, end, period,
+    paidDate:v('quit-paid-date')||isoToday(),
+    payment:v('quit-payment')||'Virement',
+    template:v('quit-template')||'classic',
+    note:v('quit-note')
+  };
+}
+function refreshQuittancePreview(){
+  const data=getPreparedQuittanceData();
+  const total=$('quit-total'), preview=$('quit-period-preview');
+  if(total) total.textContent=euro(data.total);
+  if(preview) preview.textContent='Période : '+data.period;
+}
+function syncQuittancePeriodMode(){
+  const isCustom=v('quit-period-mode')==='custom';
+  const monthField=$('quit-month-field'), custom=$('quit-custom-period');
+  if(monthField) monthField.style.display=isCustom?'none':'block';
+  if(custom) custom.style.display=isCustom?'grid':'none';
+  if(!isCustom){
+    const b=monthBounds(v('quit-month'));
+    sv('quit-start',b.start); sv('quit-end',b.end);
+  }
+  refreshQuittancePreview();
+}
+function openQuittanceOptions(loc){
+  const nom=[loc.prenom,loc.nom].filter(Boolean).join(' ') || 'Locataire';
+  sv('quit-loc-id',loc.id);
+  const nameEl=$('quit-loc-name'), bienEl=$('quit-loc-bien');
+  if(nameEl) nameEl.textContent=nom;
+  if(bienEl) bienEl.textContent=loc.bien || '—';
+  sv('quit-period-mode','month');
+  sv('quit-month',currentMonthValue());
+  const b=monthBounds(currentMonthValue());
+  sv('quit-start',b.start); sv('quit-end',b.end);
+  sv('quit-paid-date',isoToday());
+  sv('quit-payment','Virement');
+  sv('quit-rent',+loc.loyer||0);
+  sv('quit-charges',+loc.charges||0);
+  sv('quit-adjust',0);
+  sv('quit-template','classic');
+  sv('quit-note','');
+  syncQuittancePeriodMode();
+  openModal('m-quittance');
+}
+async function generatePreparedQuittance(){
+  const data=getPreparedQuittanceData();
+  if(!data.loc){ toast('Locataire introuvable pour générer la quittance.'); return; }
+  if(!data.start || !data.end){ toast('Choisis une période valide.'); return; }
+  closeModal('m-quittance');
+  await genQuittance(data);
+}
+async function genQuittance(data){
+  const {locName,bien,rent,charges,adjust,total,period,paidDate,payment,template,note}=data;
   const w=window.open('','_blank');
   if(!w){ toast('Popup bloquée : autorise les fenêtres pour générer la quittance.'); return; }
   w.document.write('<p style="font-family:Arial;padding:30px">Préparation de la quittance...</p>');
   const legal=await getCurrentStructureLegalInfo();
   const today=new Date().toLocaleDateString('fr-FR');
-  const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Quittance de loyer - ${esc(nom)} - ${esc(mois)}</title>
+  const style=quittanceStyle(template);
+  const ref='QUIT-'+new Date().getFullYear()+'-'+String(Date.now()).slice(-6);
+  const accountingExtra=template==='accounting'?`<section class="box accounting"><h2>Suivi comptable</h2><div class="row"><span>Référence</span><strong>${esc(ref)}</strong></div><div class="row"><span>Date d'encaissement</span><strong>${esc(formatLongDate(paidDate))}</strong></div><div class="row"><span>Mode de paiement</span><strong>${esc(payment)}</strong></div><div class="row"><span>Document</span><strong>Quittance à archiver</strong></div></section>`:'';
+  const html=`<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Quittance de loyer - ${esc(locName)} - ${esc(period)}</title>
   <style>
-    @page{size:A4;margin:18mm} body{font-family:Arial,Helvetica,sans-serif;color:#1f1f1f;background:#fff;margin:0;font-size:13px;line-height:1.45} .page{max-width:780px;margin:0 auto;padding:26px}
-    .top{display:flex;justify-content:space-between;gap:28px;border-bottom:3px solid #c9a84c;padding-bottom:20px;margin-bottom:26px}.brand{display:flex;gap:14px;align-items:flex-start}.logo{width:58px;height:58px;border-radius:14px;background:linear-gradient(135deg,#c9a84c,#e8c97a);display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:700;font-size:22px;color:#17130a}.brand h1{font-family:Georgia,serif;font-size:25px;margin:0 0 4px}.muted{color:#666}.small{font-size:11px}.right{text-align:right;min-width:230px}.title{font-family:Georgia,serif;text-align:center;font-size:30px;margin:24px 0 8px}.subtitle{text-align:center;color:#666;margin-bottom:28px}.box{border:1px solid #ddd;border-radius:14px;padding:18px;margin:18px 0}.box h2{font-size:15px;margin:0 0 12px;text-transform:uppercase;letter-spacing:1px;color:#8b7530}.legal-line,.row{display:flex;justify-content:space-between;gap:20px;padding:7px 0;border-bottom:1px solid #eee}.legal-line:last-child,.row:last-child{border-bottom:none}.legal-line span,.row span:first-child{color:#666}.amount{font-size:18px;font-weight:700}.total{background:#f7f1df;border:1px solid #dfcf9b;border-radius:12px;padding:14px 16px;margin-top:10px}.notice{font-size:12px;color:#555;background:#f8f8f8;border-left:4px solid #c9a84c;padding:12px 14px;margin:22px 0}.signature{margin-top:42px;display:flex;justify-content:space-between;gap:28px}.sigbox{text-align:right;min-width:230px}.print-btn{position:fixed;right:18px;top:18px;border:0;border-radius:10px;background:#c9a84c;color:#111;padding:10px 16px;font-weight:700;cursor:pointer}@media print{.print-btn{display:none}.page{padding:0}.box{break-inside:avoid}}
+    ${style}
   </style></head><body><button class="print-btn" onclick="window.print()">Imprimer / PDF</button><main class="page">
   <section class="top"><div class="brand"><div class="logo">SF</div><div><h1>${esc(legal.name||entityName())}</h1><div class="muted">${esc(legal.form||entityType())}${legal.capital?' · Capital : '+esc(legal.capital):''}</div><div class="small muted">${esc(legal.address||'')}${legal.city?' · '+esc(legal.city):''}</div></div></div><div class="right small muted">${legal.siret?'SIRET : '+esc(legal.siret)+'<br>':''}${legal.rcs?esc(legal.rcs)+'<br>':''}${legal.email?esc(legal.email)+'<br>':''}${legal.phone?esc(legal.phone):''}</div></section>
-  <h1 class="title">Quittance de loyer</h1><div class="subtitle">Période : <strong>${esc(mois)}</strong></div>
+  <h1 class="title">Quittance de loyer</h1><div class="subtitle">Période : <strong>${esc(period)}</strong></div>
   <section class="box"><h2>Bailleur</h2>${legalLine('Structure',legal.name||entityName())}${legalLine('Adresse', [legal.address,legal.city].filter(Boolean).join(' · '))}${legalLine('Gérant / représentant',legal.manager)}${legalLine('SIRET',legal.siret)}</section>
-  <section class="box"><h2>Locataire</h2><div class="row"><span>Nom</span><strong>${esc(nom)}</strong></div>${bienLoué?`<div class="row"><span>Logement loué</span><strong>${esc(bienLoué)}</strong></div>`:''}</section>
-  <section class="box"><h2>Détail du règlement</h2><div class="row"><span>Loyer hors charges</span><strong>${(+loyer||0).toLocaleString('fr-FR')} €</strong></div><div class="row"><span>Provision / charges</span><strong>${(+charges||0).toLocaleString('fr-FR')} €</strong></div><div class="row total"><span>Total acquitté</span><strong class="amount">${total.toLocaleString('fr-FR')} €</strong></div></section>
+  <section class="box"><h2>Locataire</h2><div class="row"><span>Nom</span><strong>${esc(locName)}</strong></div>${bien?`<div class="row"><span>Logement loué</span><strong>${esc(bien)}</strong></div>`:''}</section>
+  <section class="box"><h2>Détail du règlement</h2><div class="row"><span>Loyer hors charges</span><strong>${euro(rent)}</strong></div><div class="row"><span>Provision / charges</span><strong>${euro(charges)}</strong></div>${adjust?`<div class="row"><span>Régularisation</span><strong>${euro(adjust)}</strong></div>`:''}<div class="row"><span>Mode de paiement</span><strong>${esc(payment)}</strong></div><div class="row"><span>Date de paiement</span><strong>${esc(formatLongDate(paidDate))}</strong></div><div class="row total"><span>Total acquitté</span><strong class="amount">${euro(total)}</strong></div></section>
+  ${accountingExtra}
   <p class="notice">Le bailleur reconnaît avoir reçu du locataire la somme indiquée ci-dessus au titre du loyer et des charges pour la période mentionnée, sous réserve d’encaissement effectif.</p>
-  ${legal.notes?`<p class="notice">${esc(legal.notes)}</p>`:''}
+  ${note?`<p class="notice">${esc(note)}</p>`:''}${legal.notes?`<p class="notice">${esc(legal.notes)}</p>`:''}
   <section class="signature"><div><strong>Fait le ${today}</strong><br><span class="muted">Quittance générée par SCI Family</span></div><div class="sigbox"><div>Signature du bailleur</div><br><br><br><strong>${esc(legal.name||entityName())}</strong></div></section>
   </main></body></html>`;
   w.document.open(); w.document.write(html); w.document.close();
+}
+function quittanceStyle(template){
+  const base='@page{size:A4;margin:18mm}body{font-family:Arial,Helvetica,sans-serif;color:#1f1f1f;background:#fff;margin:0;font-size:13px;line-height:1.45}.page{max-width:780px;margin:0 auto;padding:26px}.top{display:flex;justify-content:space-between;gap:28px;padding-bottom:20px;margin-bottom:26px}.brand{display:flex;gap:14px;align-items:flex-start}.logo{width:58px;height:58px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-weight:700;font-size:22px}.brand h1{font-family:Georgia,serif;font-size:25px;margin:0 0 4px}.muted{color:#666}.small{font-size:11px}.right{text-align:right;min-width:230px}.title{font-family:Georgia,serif;text-align:center;font-size:30px;margin:24px 0 8px}.subtitle{text-align:center;color:#666;margin-bottom:28px}.box{border:1px solid #ddd;border-radius:14px;padding:18px;margin:18px 0}.box h2{font-size:15px;margin:0 0 12px;text-transform:uppercase;letter-spacing:1px}.legal-line,.row{display:flex;justify-content:space-between;gap:20px;padding:7px 0;border-bottom:1px solid #eee}.legal-line:last-child,.row:last-child{border-bottom:none}.legal-line span,.row span:first-child{color:#666}.amount{font-size:18px;font-weight:700}.notice{font-size:12px;color:#555;padding:12px 14px;margin:22px 0}.signature{margin-top:42px;display:flex;justify-content:space-between;gap:28px}.sigbox{text-align:right;min-width:230px}.print-btn{position:fixed;right:18px;top:18px;border:0;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer}@media print{.print-btn{display:none}.page{padding:0}.box{break-inside:avoid}}';
+  if(template==='modern') return base+'.top{border-bottom:0;background:linear-gradient(135deg,#e9f7f3,#eef4ff);border-radius:22px;padding:22px}.logo{background:linear-gradient(135deg,#1f9d85,#2f6ecb);color:#fff}.title{color:#0f5f55}.box{border-color:#cfe4df;background:#fbfefd}.box h2{color:#1f9d85}.total{background:#e9f7f3;border:1px solid #a8d8ce;border-radius:12px;padding:14px 16px;margin-top:10px}.notice{background:#f2f8ff;border-left:4px solid #2f6ecb}.print-btn{background:#1f9d85;color:#fff}';
+  if(template==='accounting') return base+'.top{border-bottom:3px solid #1f2937}.logo{background:#1f2937;color:#fff}.title{letter-spacing:.5px}.box{border-radius:6px}.box h2{color:#1f2937}.total{background:#f3f4f6;border:1px solid #cfd6df;border-radius:6px;padding:14px 16px;margin-top:10px}.notice{background:#f8f8f8;border-left:4px solid #1f2937}.accounting{background:#fbfbfb}.print-btn{background:#1f2937;color:#fff}';
+  return base+'.top{border-bottom:3px solid #c9a84c}.logo{background:linear-gradient(135deg,#c9a84c,#e8c97a);color:#17130a}.box h2{color:#8b7530}.total{background:#f7f1df;border:1px solid #dfcf9b;border-radius:12px;padding:14px 16px;margin-top:10px}.notice{background:#f8f8f8;border-left:4px solid #c9a84c}.print-btn{background:#c9a84c;color:#111}';
 }
 
 // ══ COMMUNICATION / DÉCISIONS ══

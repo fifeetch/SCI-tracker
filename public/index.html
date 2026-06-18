@@ -1127,6 +1127,75 @@
   </div>
 </div>
 
+<!-- Préparation quittance -->
+<div class="modal-overlay" id="m-quittance">
+  <div class="modal quittance-modal">
+    <h3 id="mquit-t">🧾 Préparer une quittance</h3>
+    <input type="hidden" id="quit-loc-id">
+    <div class="legal-help">Vérifiez la période, le règlement et le modèle avant génération. Les montants sont préremplis depuis la fiche locataire.</div>
+    <div class="quittance-summary">
+      <div><span>Locataire</span><strong id="quit-loc-name">—</strong></div>
+      <div><span>Bien loué</span><strong id="quit-loc-bien">—</strong></div>
+    </div>
+    <div class="frow">
+      <div class="fg">
+        <label>Type de période</label>
+        <select id="quit-period-mode" onchange="syncQuittancePeriodMode()">
+          <option value="month">Mois complet</option>
+          <option value="custom">Période personnalisée</option>
+        </select>
+      </div>
+      <div class="fg" id="quit-month-field">
+        <label>Mois concerné</label>
+        <input type="month" id="quit-month" onchange="syncQuittancePeriodMode()">
+      </div>
+    </div>
+    <div class="frow" id="quit-custom-period" style="display:none">
+      <div class="fg"><label>Du</label><input type="date" id="quit-start" onchange="refreshQuittancePreview()"></div>
+      <div class="fg"><label>Au</label><input type="date" id="quit-end" onchange="refreshQuittancePreview()"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Date de paiement</label><input type="date" id="quit-paid-date"></div>
+      <div class="fg">
+        <label>Mode de paiement</label>
+        <select id="quit-payment">
+          <option>Virement</option>
+          <option>Prélèvement</option>
+          <option>Chèque</option>
+          <option>Espèces</option>
+          <option>Carte bancaire</option>
+          <option>Autre</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Loyer hors charges (€)</label><input type="number" id="quit-rent" step="0.01" oninput="refreshQuittancePreview()"></div>
+      <div class="fg"><label>Provisions / charges (€)</label><input type="number" id="quit-charges" step="0.01" oninput="refreshQuittancePreview()"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Régularisation (€)</label><input type="number" id="quit-adjust" step="0.01" value="0" oninput="refreshQuittancePreview()"></div>
+      <div class="fg">
+        <label>Modèle PDF</label>
+        <select id="quit-template">
+          <option value="classic">Classique administratif</option>
+          <option value="modern">Moderne SCI Family</option>
+          <option value="accounting">Comptable détaillé</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>Note visible sur la quittance</label><textarea id="quit-note" rows="3" placeholder="Exemple : règlement reçu sous réserve d'encaissement effectif."></textarea></div>
+    <div class="quittance-total-box">
+      <span>Total quittance</span>
+      <strong id="quit-total">0 €</strong>
+      <small id="quit-period-preview">Période : —</small>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-out" onclick="closeModal('m-quittance')">Annuler</button>
+      <button class="btn" onclick="generatePreparedQuittance()">Générer la quittance</button>
+    </div>
+  </div>
+</div>
+
 <!-- Associé -->
 <div class="modal-overlay" id="m-assoc">
   <div class="modal">
