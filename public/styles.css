@@ -878,6 +878,8 @@
   .settings-info-list strong{color:var(--text);text-align:right;word-break:break-word;}
   .settings-firebase-card{border-color:rgba(47,110,203,.22)!important;}
   .settings-notification-card{border-color:rgba(31,157,133,.24)!important;}
+  .sci-card.is-loading{opacity:.78;cursor:default;animation:sciPulse 1.4s ease-in-out infinite;}
+  @keyframes sciPulse{0%,100%{filter:saturate(1);transform:none}50%{filter:saturate(.85);transform:translateY(-1px)}}
   .push-preferences{display:grid;gap:8px;margin:12px 0 2px;}
   .push-pref-row{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--text);cursor:pointer;}
   .push-pref-row input{width:16px;height:16px;accent-color:var(--v2-mint);}

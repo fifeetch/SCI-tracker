@@ -508,6 +508,7 @@ async function loadUserRole(){
   APP_STATE.profile = profile;
   APP_STATE.scis = scis;
   APP_STATE.currentSCI = current;
+  cacheKnownScis(scis);
   const roleNorm = String(current.role || 'associe').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   APP_STATE.role = roleNorm === 'gerant' ? 'gerant' : 'associe';
   document.body.setAttribute('data-role', APP_STATE.role);
@@ -685,12 +686,43 @@ window.clearProfilePhoto = function(){
   refreshProfileMenu(v('account-prenom'), v('account-nom'), auth.currentUser?.email||'', '');
 };
 
+function cacheKnownScis(scis){
+  try{
+    if(Array.isArray(scis) && scis.length){
+      localStorage.setItem('sci_known_structures', JSON.stringify(scis.map(s=>({
+        sciId:s.sciId, nom:s.nom, role:s.role, actif:s.actif !== false
+      }))));
+    }
+  }catch(e){ console.warn('Cache structures non enregistre', e); }
+}
+function readKnownScis(){
+  try{
+    const rows=JSON.parse(localStorage.getItem('sci_known_structures')||'[]');
+    return Array.isArray(rows) ? rows.filter(x=>x && x.sciId) : [];
+  }catch(e){ return []; }
+}
+function renderStructuresLoading(){
+  const set=(id,val)=>{const el=document.getElementById(id); if(el) el.textContent=val;};
+  const cached=readKnownScis();
+  set('ms-scis', cached.length ? cached.length : '...');
+  set('ms-role', 'Chargement');
+  set('ms-current', cached[0]?.nom || 'Chargement');
+  const box=document.getElementById('sci-cards');
+  if(!box) return;
+  if(cached.length){
+    box.innerHTML=cached.map(s=>`<div class="sci-card is-loading"><div class="sci-name">${esc(s.nom||s.sciId)}</div><div class="sci-meta">Connexion a Firebase...</div><div class="sci-actions"><button class="btn-out btn-sm" type="button">Chargement</button></div></div>`).join('');
+  }else{
+    box.innerHTML='<div class="sci-card is-loading"><div class="sci-name">Chargement des SCI...</div><div class="sci-meta">Connexion a Firebase en cours.</div></div>';
+  }
+}
+
 // ══ AUTH STATE ══
 auth.onAuthStateChanged(async user=>{
   if(user){
     try{
       document.getElementById('auth-screen').style.display='none';
       document.getElementById('app-wrapper').style.display='block';
+      renderStructuresLoading();
       await loadUserRole();
       await loadAccountProfile();
       applyRoleUI();
