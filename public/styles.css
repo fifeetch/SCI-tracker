@@ -1517,6 +1517,26 @@ html[data-display-mode="mobile"]{
   background:rgba(16,47,96,.82)!important;
   border-color:rgba(170,199,236,.18)!important;
 }
+.display-mode-shortcuts{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+.display-mode-shortcuts button{
+  border:1px solid var(--border);
+  background:var(--surface2);
+  color:var(--text);
+  border-radius:12px;
+  min-height:42px;
+  padding:9px 8px;
+  font:800 12px/1.1 'DM Sans',sans-serif;
+  cursor:pointer;
+}
+.display-mode-shortcuts button:hover{
+  border-color:rgba(31,157,133,.42);
+  background:rgba(31,157,133,.10);
+}
 
 @media (min-width:1025px){
   html[data-display-mode] .page{
