@@ -810,13 +810,13 @@ function initDisplayMode(){
   if(sel) sel.value=mode;
 }
 function setDisplayMode(mode){
-  const allowed=['desktop','wide','comfort','compact'];
+  const allowed=['desktop','wide','comfort','mobile','compact'];
   const next=allowed.includes(mode)?mode:'desktop';
   localStorage.setItem('sci_display_mode',next);
   document.documentElement.setAttribute('data-display-mode',next);
   const sel=$('display-mode-select');
   if(sel) sel.value=next;
-  toast('Mode affichage : '+({desktop:'Ordinateur',wide:'Grand écran',comfort:'Confort lecture',compact:'Compact'}[next]||next));
+  toast('Mode affichage : '+({desktop:'Ordinateur',wide:'Grand écran',comfort:'Confort lecture',mobile:'Mobile',compact:'Compact'}[next]||next));
 }
 
 
