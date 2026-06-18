@@ -792,6 +792,7 @@ async function saveWithFeedback(promise, successMsg){
 function initTheme(){
   const t=localStorage.getItem('sci_theme')||'light';
   document.documentElement.setAttribute('data-theme',t);
+  initDisplayMode();
   const ti=$('t-icon');if(ti)ti.textContent=t==='dark'?'🌙':'☀️';
   const tl=$('t-lbl');if(tl)tl.textContent=t==='dark'?'Mode clair':'Mode sombre';
 }
@@ -801,6 +802,21 @@ function toggleTheme(){
   localStorage.setItem('sci_theme',t);
   const ti=$('t-icon');if(ti)ti.textContent=t==='dark'?'🌙':'☀️';
   const tl=$('t-lbl');if(tl)tl.textContent=t==='dark'?'Mode clair':'Mode sombre';
+}
+function initDisplayMode(){
+  const mode=localStorage.getItem('sci_display_mode')||'desktop';
+  document.documentElement.setAttribute('data-display-mode',mode);
+  const sel=$('display-mode-select');
+  if(sel) sel.value=mode;
+}
+function setDisplayMode(mode){
+  const allowed=['desktop','wide','comfort','compact'];
+  const next=allowed.includes(mode)?mode:'desktop';
+  localStorage.setItem('sci_display_mode',next);
+  document.documentElement.setAttribute('data-display-mode',next);
+  const sel=$('display-mode-select');
+  if(sel) sel.value=next;
+  toast('Mode affichage : '+({desktop:'Ordinateur',wide:'Grand écran',comfort:'Confort lecture',compact:'Compact'}[next]||next));
 }
 
 
@@ -960,6 +976,7 @@ function renderFirebaseDiagnostics(){
 }
 function renderParametres(){
   loadAccountProfile();
+  initDisplayMode();
   renderStorageUsage();
   renderSCISwitcher();
   renderFirebaseDiagnostics();

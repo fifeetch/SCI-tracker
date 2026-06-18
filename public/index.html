@@ -899,7 +899,16 @@
       <div class="card-hd"><div><div class="card-title">🎨 Apparence</div><div class="card-sub">Mode clair / sombre</div></div></div>
       <div class="divider"></div>
       <button class="btn-out" type="button" onclick="toggleTheme()">Changer le thème</button>
-      <p class="readonly-note">Le mode clair est utilisé par défaut. Le choix est mémorisé sur cet appareil.</p>
+      <div class="fg" style="margin-top:14px">
+        <label>Mode d'affichage</label>
+        <select id="display-mode-select" onchange="setDisplayMode(this.value)">
+          <option value="desktop">Ordinateur</option>
+          <option value="wide">Grand écran</option>
+          <option value="comfort">Confort lecture</option>
+          <option value="compact">Compact</option>
+        </select>
+      </div>
+      <p class="readonly-note">Le mode clair et le mode d'affichage sont mémorisés sur cet appareil. Par défaut : Ordinateur.</p>
     </div>
     <div class="settings-section-title" data-settings-section="backup">Sauvegarde et stockage</div>
     <div class="card" data-settings-section="backup" style="cursor:default">
