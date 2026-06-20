@@ -385,6 +385,23 @@
     </div>
   </div>
 
+  <div class="compta-section-card accountant-panel open" id="section-accountant">
+    <div class="compta-section-head" onclick="toggleComptaSection('section-accountant')">
+      <div class="compta-section-title">
+        <div class="compta-section-icon">👤</div>
+        <div><h3>Fiche du comptable</h3><p>Coordonnées du cabinet et de votre interlocuteur comptable.</p></div>
+      </div>
+      <div class="compta-section-meta">
+        <span class="compta-mini-badge" id="accountant-status">À renseigner</span>
+        <span class="compta-chevron">⌄</span>
+      </div>
+    </div>
+    <div class="compta-section-body">
+      <div id="accountant-profile-view" class="contact-profile-view"></div>
+      <div class="journal-table-actions"><button class="btn write-only" onclick="openAccountantModal()">✏️ Modifier la fiche</button></div>
+    </div>
+  </div>
+
   <div class="compta-section-card journal-panel" id="section-journal">
     <div class="compta-section-head" onclick="toggleComptaSection('section-journal')">
       <div class="compta-section-title">
@@ -1086,6 +1103,13 @@
         <div class="fg"><label>Bail lié</label><select id="b-bail-id"><option value="">— Aucun bail lié —</option></select></div>
       </div>
     </div>
+    <div class="property-contacts-section">
+      <div class="property-contacts-head">
+        <div><h4>Interlocuteurs du bien</h4><p>Syndic, agence immobilière, assurance, notaire ou autre contact utile.</p></div>
+        <button class="btn-out btn-sm" type="button" onclick="addPropertyContact()">+ Ajouter un interlocuteur</button>
+      </div>
+      <div id="b-contacts-list" class="property-contacts-list"></div>
+    </div>
     <div class="fg"><label>Notes</label><textarea id="b-notes" rows="3" placeholder="Informations complémentaires..."></textarea></div>
     <div class="modal-actions">
       <button class="btn-del" id="b-del" style="display:none" onclick="confirmDel('bien')">🗑 Supprimer</button>
@@ -1307,6 +1331,27 @@
 </div>
 
 <!-- Règles automatiques du journal -->
+<div class="modal-overlay" id="m-accountant">
+  <div class="modal">
+    <h3>👤 Fiche du comptable</h3>
+    <div class="frow">
+      <div class="fg"><label>Société / cabinet</label><input type="text" id="accountant-company" placeholder="Cabinet comptable"></div>
+      <div class="fg"><label>Nom du comptable</label><input type="text" id="accountant-name" placeholder="Prénom et nom"></div>
+    </div>
+    <div class="fg"><label>Adresse</label><input type="text" id="accountant-address" placeholder="Adresse complète du cabinet"></div>
+    <div class="frow">
+      <div class="fg"><label>Téléphone</label><input type="tel" id="accountant-phone" placeholder="01 23 45 67 89"></div>
+      <div class="fg"><label>Email</label><input type="email" id="accountant-email" placeholder="comptable@cabinet.fr"></div>
+    </div>
+    <div class="fg"><label>Notes</label><textarea id="accountant-notes" rows="3" placeholder="Horaires, numéro de dossier, préférences d’envoi..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-out" onclick="closeModal('m-accountant')">Annuler</button>
+      <button class="btn" onclick="saveAccountantProfile()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Règles automatiques du journal -->
 <div class="modal-overlay" id="m-accounting-rules">
   <div class="modal accounting-rules-modal">
     <h3>⚙️ Règles automatiques du journal</h3>
@@ -1384,6 +1429,7 @@
     <div class="fg"><label>Bien concerné</label><select id="ech-bien"><option value="">— Tous les biens —</option></select></div>
     <div class="fg"><label>Locataire concerné (optionnel)</label><select id="ech-loc"><option value="">— Aucun —</option></select></div>
     <div class="fg"><label>Montant (€, optionnel)</label><input type="number" id="ech-mt" placeholder="ex: 1200"></div>
+    <div class="fg"><label>Récurrence</label><select id="ech-recurrence"><option value="none">Ne pas répéter</option><option value="yearly">Tous les ans</option></select><p class="small-help">Une échéance annuelle traitée est automatiquement reprogrammée un an plus tard.</p></div>
     <div class="fg"><label>Notes</label><textarea id="ech-notes" rows="2" placeholder="Détails, actions à faire..."></textarea></div>
     <div class="fg" style="display:flex;align-items:center;gap:10px;background:var(--inp);border:1px solid var(--border);border-radius:10px;padding:12px 13px">
       <input type="checkbox" id="ech-done" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0">
@@ -1575,7 +1621,7 @@
 </nav>
 
 <!-- Firebase SDK déplacé dans le <head> -->
-<script src="app.js?v=20260620-journal-delete-all"></script>
+<script src="app.js?v=20260620-agenda-contacts-accountant"></script>
 
 <!-- ══ APP — script classique, scope global ══ -->
 

@@ -1762,6 +1762,7 @@ function renderBiens(){
       <div class="info-row"><span>Type de bail</span><span>${esc(b.typeBail||'—')}</span></div>
       <div class="info-row"><span>Valeur estimée</span><span>${(+b.val||0).toLocaleString('fr-FR')} €</span></div>
       ${b.notes?`<div class="note-box">📝 ${esc(b.notes)}</div>`:''}
+      ${propertyContactsSummaryHtml(b)}
       ${linkedDocsHTML(b)}
     </div>`).join(''):'<p style="color:var(--text2);padding:20px">Aucune parcelle enregistrée.</p>';
     return;
@@ -1780,6 +1781,7 @@ function renderBiens(){
       <div style="font-size:12px;color:var(--text2)">Rendement brut</div>
       <div class="progress"><div class="progress-bar" style="width:${b.val?Math.min((b.loyer*12/b.val*100)*2,100).toFixed(0):0}%"></div></div>
       <div style="font-size:12px;color:var(--gold);margin-top:4px">${b.val?(b.loyer*12/b.val*100).toFixed(2):'—'} % / an</div>
+      ${propertyContactsSummaryHtml(b)}
       ${linkedDocsHTML(b)}
     </div>`).join(''):'<p style="color:var(--text2);padding:20px">Aucun bien enregistré.</p>';
 }
@@ -2532,6 +2534,37 @@ function currentJournalFilters(){
     status: $('journal-filter-status')?.value || 'all'
   };
 }
+function getAccountantProfile(){
+  return (window.CACHE?.settings||[]).find(x=>String(x.id)==='accountantProfile')||null;
+}
+function renderAccountantProfile(){
+  const p=getAccountantProfile()||{};
+  const box=$('accountant-profile-view'), status=$('accountant-status');
+  const has=!!(p.company||p.name||p.address||p.phone||p.email||p.notes);
+  if(status) status.textContent=has?(p.company||p.name||'Renseigné'):'À renseigner';
+  if(!box) return;
+  if(!has){ box.innerHTML='<div class="contact-profile-empty">Aucune coordonnée comptable enregistrée pour cette structure.</div>'; return; }
+  const field=(label,value,wide=false)=>value?`<div class="contact-profile-field${wide?' wide':''}"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`:'';
+  box.innerHTML=field('Société / cabinet',p.company)+field('Comptable',p.name)+field('Téléphone',p.phone)+field('Email',p.email)+field('Adresse',p.address,true)+field('Notes',p.notes,true);
+}
+function openAccountantModal(){
+  if(!canWrite()){ denyWrite(); return; }
+  const p=getAccountantProfile()||{};
+  sv('accountant-company',p.company||''); sv('accountant-name',p.name||''); sv('accountant-address',p.address||''); sv('accountant-phone',p.phone||''); sv('accountant-email',p.email||''); sv('accountant-notes',p.notes||'');
+  openModal('m-accountant');
+}
+async function saveAccountantProfile(){
+  if(!canWrite()){ denyWrite(); return; }
+  const obj={id:'accountantProfile',company:v('accountant-company'),name:v('accountant-name'),address:v('accountant-address'),phone:v('accountant-phone'),email:v('accountant-email'),notes:v('accountant-notes')};
+  const ok=await saveWithFeedback(window.dbSet?.('settings',obj),'Fiche du comptable enregistrée ✓');
+  if(!ok) return;
+  const settings=window.CACHE?.settings;
+  if(Array.isArray(settings)){
+    const i=settings.findIndex(x=>String(x.id)==='accountantProfile');
+    if(i>=0) settings[i]={...settings[i],...obj}; else settings.push(obj);
+  }
+  renderAccountantProfile(); closeModal('m-accountant');
+}
 function opMatchesJournalFilters(op, f){
   const mt=+op.mt||0;
   if(f.type==='recette' && mt<=0) return false;
@@ -2552,6 +2585,7 @@ function renderCompta(){
   const ct=document.querySelector('#page-compta .sec-hdr h2'); const cp=document.querySelector('#page-compta .sec-hdr p');
   if(ct) ct.textContent=isGFAContext()?'Fermages et comptabilité GFA':'Comptabilité';
   if(cp) cp.textContent=isGFAContext()?'Suivi des fermages, recettes agricoles, charges foncières, taxes et justificatifs.':'Pilotage financier, journal comptable, budget prévisionnel et préparation comptable.';
+  renderAccountantProfile();
   const ops=window.CACHE?.ops||[];
   const rec=ops.filter(o=>(+o.mt||0)>0).reduce((s,o)=>s+(+o.mt||0),0);
   const chg=ops.filter(o=>(+o.mt||0)<0).reduce((s,o)=>s+Math.abs(+o.mt||0),0);
@@ -3272,19 +3306,52 @@ function setBienModalMode(b={}){
   if(stat) stat.innerHTML=gfa?'<option>Exploitée</option><option>Louée</option><option>Libre</option><option>Boisée</option><option>En travaux</option>':'<option>Loué</option><option>Vacant</option><option>En travaux</option>';
   if(dpe) dpe.innerHTML=gfa?'<option>Agricole</option><option>Prairie</option><option>Bois</option><option>Bâti rural</option><option>Mixte</option><option>Autre</option>':'<option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option>';
 }
+const PROPERTY_CONTACT_TYPES=['Syndic','Agence immobilière','Assurance','Notaire','Artisan / prestataire','Autre'];
+function collectPropertyContacts(includeEmpty=false){
+  const contacts=Array.from(document.querySelectorAll('#b-contacts-list .property-contact-card')).map(card=>{
+    const get=key=>card.querySelector(`[data-contact-field="${key}"]`)?.value?.trim()||'';
+    return {type:get('type'),company:get('company'),name:get('name'),address:get('address'),phone:get('phone'),email:get('email'),note:get('note')};
+  });
+  return includeEmpty?contacts:contacts.filter(c=>Object.entries(c).some(([key,value])=>key!=='type'&&!!value));
+}
+function renderPropertyContacts(contacts=[]){
+  const box=$('b-contacts-list'); if(!box) return;
+  box.innerHTML=contacts.length?contacts.map((c,i)=>`<div class="property-contact-card">
+    <button class="property-contact-remove" type="button" title="Supprimer cet interlocuteur" onclick="removePropertyContact(${i})">×</button>
+    <div class="property-contact-card-title">Interlocuteur ${i+1}</div>
+    <div class="frow"><div class="fg"><label>Type</label><select data-contact-field="type">${PROPERTY_CONTACT_TYPES.map(t=>`<option${t===(c.type||'Syndic')?' selected':''}>${esc(t)}</option>`).join('')}</select></div><div class="fg"><label>Institution / société</label><input data-contact-field="company" type="text" value="${esc(c.company||'')}" placeholder="Nom de l’organisme"></div></div>
+    <div class="frow"><div class="fg"><label>Nom de l’interlocuteur</label><input data-contact-field="name" type="text" value="${esc(c.name||'')}" placeholder="Prénom et nom"></div><div class="fg"><label>Adresse</label><input data-contact-field="address" type="text" value="${esc(c.address||'')}" placeholder="Adresse complète"></div></div>
+    <div class="frow"><div class="fg"><label>Téléphone</label><input data-contact-field="phone" type="tel" value="${esc(c.phone||'')}" placeholder="Téléphone"></div><div class="fg"><label>Email</label><input data-contact-field="email" type="email" value="${esc(c.email||'')}" placeholder="Email"></div></div>
+    <div class="fg"><label>Notes</label><textarea data-contact-field="note" rows="2" placeholder="Rôle de l’interlocuteur, horaires, références...">${esc(c.note||'')}</textarea></div>
+  </div>`).join(''):'<div class="contact-profile-empty">Aucun interlocuteur renseigné pour ce bien.</div>';
+}
+function addPropertyContact(){
+  const contacts=collectPropertyContacts(true);
+  contacts.push({type:'Syndic',company:'',name:'',address:'',phone:'',email:'',note:''});
+  renderPropertyContacts(contacts);
+}
+function removePropertyContact(index){
+  const contacts=collectPropertyContacts(true); contacts.splice(index,1); renderPropertyContacts(contacts);
+}
+function propertyContactsSummaryHtml(b){
+  const contacts=Array.isArray(b?.contacts)?b.contacts.filter(c=>c&&(c.company||c.name||c.phone||c.email)):[];
+  if(!contacts.length) return '';
+  return `<div class="divider"></div><div style="font-size:12px;color:var(--text2);margin-bottom:6px">Interlocuteurs (${contacts.length})</div>${contacts.slice(0,3).map(c=>`<div class="info-row"><span>${esc(c.type||'Contact')}</span><span>${esc(c.company||c.name||c.email||c.phone||'—')}</span></div>`).join('')}`;
+}
 function openBienModal(id){
   const e=id!=null,b=e?(window.CACHE?.biens||[]).find(x=>String(x.id)===String(id)):null;
   setBienModalMode(b||{});
   $('mbien-t').innerHTML=e?(isGFAContext()?'🌾 Modifier la parcelle &nbsp;<span class="mbadge">Édition</span>':'🏠 Modifier le bien &nbsp;<span class="mbadge">Édition</span>'):(isGFAContext()?'🌾 Nouvelle parcelle':'🏠 Nouveau bien');
   $('b-del').style.display=e?'block':'none';
   fillParcelleBauxSelect(b?.bailId||'');
+  renderPropertyContacts(Array.isArray(b?.contacts)?b.contacts:[]);
   if(e&&b){sv('b-id',b.id);sv('b-adr',b.adr);sv('b-type',b.type);sv('b-surf',b.surf);sv('b-val',b.val);sv('b-loyer',b.loyer);sv('b-stat',b.stat);sv('b-dpe',b.dpe);sv('b-notes',b.notes||'');sv('b-commune',b.commune||'');sv('b-cadastre',b.cadastre||'');sv('b-nature',b.nature||'Terre agricole');sv('b-exploitant',b.exploitant||'');sv('b-type-bail',b.typeBail||'Non louée');sv('b-bail-id',b.bailId||'');}
   else{['b-id','b-adr','b-surf','b-val','b-loyer','b-notes','b-commune','b-cadastre','b-exploitant'].forEach(f=>sv(f,''));sv('b-type',isGFAContext()?'Terre agricole':'Appartement');sv('b-stat',isGFAContext()?'Exploitée':'Loué');sv('b-dpe',isGFAContext()?'Agricole':'C');sv('b-nature','Terre agricole');sv('b-type-bail','Non louée');sv('b-bail-id','');}
   openModal('m-bien');
 }
 async function saveBien(){
   const id=v('b-id'),e=!!id;
-  const base={id:e?+id:Date.now(),adr:v('b-adr'),type:v('b-type'),surf:+v('b-surf'),val:+v('b-val'),loyer:+v('b-loyer'),stat:v('b-stat'),dpe:v('b-dpe'),notes:v('b-notes')};
+  const base={id:e?+id:Date.now(),adr:v('b-adr'),type:v('b-type'),surf:+v('b-surf'),val:+v('b-val'),loyer:+v('b-loyer'),stat:v('b-stat'),dpe:v('b-dpe'),notes:v('b-notes'),contacts:collectPropertyContacts()};
   const obj=isGFAContext()?{...base,commune:v('b-commune'),cadastre:v('b-cadastre'),nature:v('b-nature'),exploitant:v('b-exploitant'),typeBail:v('b-type-bail'),bailId:v('b-bail-id')}:base;
   const ok = await saveWithFeedback(window.dbSet?.('biens',obj), e?(isGFAContext()?'Parcelle mise à jour ✓':'Bien mis à jour ✓'):(isGFAContext()?'Parcelle ajoutée ✓':'Bien ajouté ✓'));
   if(ok) closeModal('m-bien');
@@ -4098,6 +4165,11 @@ function generateAnnualVotesPdf(){
 // ══ ÉCHÉANCES ══
 const ECH_ICONS={bail:'🏠',loyer:'💳',irl:'📈',taxe:'🏛️',assurance:'🛡️',travaux:'🔧',fiscal:'📝',reunion:'🤝',autre:'📌'};
 const ECH_LABELS={bail:'Fin de bail',loyer:'Loyer',irl:'Révision IRL',taxe:'Taxe foncière',assurance:'Assurance',travaux:'Travaux',fiscal:'Déclaration fiscale',reunion:'Assemblée générale / Réunion SCI',autre:'Autre'};
+function nextYearDate(iso){
+  const [y,m,d]=String(iso||'').split('-').map(Number); if(!y||!m||!d) return iso;
+  const day=Math.min(d,new Date(y+1,m,0).getDate());
+  return `${y+1}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
 function echUrgency(e){if(e.done)return'done';const d=Math.ceil((new Date(e.date)-new Date())/864e5);if(d<0)return'overdue';if(d<=14)return'urgent';return'upcoming';}
 function echDaysLabel(e){if(e.done)return'✅';const d=Math.ceil((new Date(e.date)-new Date())/864e5);if(d<0)return`Retard ${Math.abs(d)}j`;if(d===0)return"Aujourd'hui";return`Dans ${d}j`;}
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
@@ -4147,13 +4219,18 @@ function echItemHtml(e){
   const sub=[timing,e.bien,e.loc,e.mt?e.mt.toLocaleString('fr-FR')+' €':''].filter(Boolean).join(' · ');
   return `<div class="ech-item${e.done?' done-item':''}" onclick="openEchModal(${e.id})">
     <div class="ech-icon">${ECH_ICONS[e.type]||'📌'}</div>
-    <div class="ech-body"><div class="ech-title">${e.titre}</div><div class="ech-sub">${ECH_LABELS[e.type]||'Autre'}${sub?' · '+sub:''}</div>${e.notes?`<div class="ech-sub" style="font-style:italic">${e.notes}</div>`:''}</div>
+    <div class="ech-body"><div class="ech-title">${e.titre}</div><div class="ech-sub">${ECH_LABELS[e.type]||'Autre'}${e.recurrence==='yearly'?' · 🔁 Tous les ans':''}${sub?' · '+sub:''}</div>${e.notes?`<div class="ech-sub" style="font-style:italic">${e.notes}</div>`:''}</div>
     <div class="ech-right"><span class="ech-dlbl ${u}">${fmtDate(e.date)}</span><span class="days-badge ${u}">${dl}</span>
     <button class="done-toggle write-only" onclick="event.stopPropagation();toggleEchDone(${e.id})">${e.done?'↩ Rouvrir':'✓ Traiter'}</button></div>
   </div>`;
 }
 async function toggleEchDone(id){
   const e=(window.CACHE?.echs||[]).find(x=>x.id===id);if(!e)return;
+  if(e.recurrence==='yearly'&&!e.done){
+    const next=nextYearDate(e.date);
+    await saveWithFeedback(window.dbSet?.('echs',{...e,date:next,done:false,lastCompletedDate:e.date}),`Traitée · prochaine échéance le ${fmtDate(next)} ✓`);
+    return;
+  }
   await saveWithFeedback(window.dbSet?.('echs',{...e,done:!e.done}), e.done?'Réouverte':'Traitée ✅');
 }
 function renderInviteLists(selectedEmails=[]){
@@ -4179,14 +4256,15 @@ function openEchModal(id){
   $('mech-t').innerHTML=e?'📅 Modifier &nbsp;<span class="mbadge">Édition</span>':'📅 Nouvelle échéance';
   $('ech-del').style.display=e?'block':'none';
   renderInviteLists(ec?.guests?.map(g=>g.email)||[]);
-  if(e&&ec){sv('ech-id',ec.id);sv('ech-titre',ec.titre);sv('ech-date',ec.date);sv('ech-type',ec.type);sv('ech-heure',ec.heure||'');sv('ech-duree',ec.duree||'');sv('ech-lieu',ec.lieu||'');if(sb)sb.value=ec.bien||'';if(sl)sl.value=ec.loc||'';sv('ech-mt',ec.mt||'');sv('ech-notes',ec.notes||'');const ed=$('ech-done');if(ed)ed.checked=!!ec.done;}
-  else{sv('ech-id','');sv('ech-titre','');sv('ech-mt','');sv('ech-notes','');sv('ech-type','bail');sv('ech-heure','');sv('ech-duree','60');sv('ech-lieu','');if(sb)sb.value='';if(sl)sl.value='';const ed=$('ech-done');if(ed)ed.checked=false;const dd=new Date();dd.setDate(dd.getDate()+30);sv('ech-date',dd.toISOString().split('T')[0]);}
+  if(e&&ec){sv('ech-id',ec.id);sv('ech-titre',ec.titre);sv('ech-date',ec.date);sv('ech-type',ec.type);sv('ech-heure',ec.heure||'');sv('ech-duree',ec.duree||'');sv('ech-lieu',ec.lieu||'');sv('ech-recurrence',ec.recurrence||'none');if(sb)sb.value=ec.bien||'';if(sl)sl.value=ec.loc||'';sv('ech-mt',ec.mt||'');sv('ech-notes',ec.notes||'');const ed=$('ech-done');if(ed)ed.checked=!!ec.done;}
+  else{sv('ech-id','');sv('ech-titre','');sv('ech-mt','');sv('ech-notes','');sv('ech-type','bail');sv('ech-heure','');sv('ech-duree','60');sv('ech-lieu','');sv('ech-recurrence','none');if(sb)sb.value='';if(sl)sl.value='';const ed=$('ech-done');if(ed)ed.checked=false;const dd=new Date();dd.setDate(dd.getDate()+30);sv('ech-date',dd.toISOString().split('T')[0]);}
   toggleReunionFields();
   openModal('m-ech');
 }
 async function saveEch(){
   const id=v('ech-id'),e=!!id,sb=$('ech-bien'),sl=$('ech-loc'),ed=$('ech-done');
-  const obj={id:e?+id:Date.now(),titre:v('ech-titre'),date:v('ech-date'),type:v('ech-type'),bien:sb?.value||'',loc:sl?.value||'',mt:+v('ech-mt')||0,notes:v('ech-notes'),done:ed?.checked||false,heure:v('ech-heure'),duree:+v('ech-duree')||0,lieu:v('ech-lieu'),guests:selectedMeetingGuests()};
+  const obj={id:e?+id:Date.now(),titre:v('ech-titre'),date:v('ech-date'),type:v('ech-type'),bien:sb?.value||'',loc:sl?.value||'',mt:+v('ech-mt')||0,notes:v('ech-notes'),done:ed?.checked||false,recurrence:v('ech-recurrence')||'none',heure:v('ech-heure'),duree:+v('ech-duree')||0,lieu:v('ech-lieu'),guests:selectedMeetingGuests()};
+  if(obj.recurrence==='yearly'&&obj.done){ obj.lastCompletedDate=obj.date; obj.date=nextYearDate(obj.date); obj.done=false; }
   const ok = await saveWithFeedback(window.dbSet?.('echs',obj), e?'Échéance mise à jour ✓':'Échéance ajoutée ✓');
   if(ok){
     if(!e && (obj.type==='reunion' || obj.heure || obj.duree)){

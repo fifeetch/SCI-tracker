@@ -268,6 +268,12 @@
   .budget-panel.journal-panel::before{content:'';display:block;height:3px;background:linear-gradient(90deg,var(--gold),var(--gold2));border-radius:999px;margin:-20px -20px 18px -20px;}
   .budget-panel.budget-previsionnel-panel{border-color:rgba(201,168,76,.22);}
   .journal-table-actions{display:flex;justify-content:flex-end;margin-top:14px;gap:10px;flex-wrap:wrap;}
+  .contact-profile-view{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:4px;}
+  .contact-profile-field{background:var(--inp);border:1px solid var(--border);border-radius:12px;padding:12px 14px;min-width:0;}
+  .contact-profile-field.wide{grid-column:1 / -1;}
+  .contact-profile-field span{display:block;color:var(--text2);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}
+  .contact-profile-field strong{display:block;color:var(--text);font-size:14px;overflow-wrap:anywhere;}
+  .contact-profile-empty{grid-column:1 / -1;color:var(--text2);background:var(--inp);border:1px dashed var(--border);border-radius:12px;padding:16px;text-align:center;}
   .journal-compact-table{width:100%;table-layout:fixed;border-collapse:collapse;}
   .journal-compact-table th:nth-child(1){width:112px;}
   .journal-compact-table th:nth-child(3){width:132px;}
@@ -281,6 +287,15 @@
   .journal-date{white-space:nowrap;color:var(--text2);font-weight:700;font-size:12px;}
   .journal-amount{font-size:17px;font-weight:900;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
   .journal-actions{display:flex;justify-content:flex-end;gap:6px;}
+  .property-contacts-section{margin:18px 0;background:var(--inp);border:1px solid var(--border);border-radius:14px;padding:14px;}
+  .property-contacts-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
+  .property-contacts-head h4{font-size:15px;margin:0 0 3px;}
+  .property-contacts-head p{font-size:12px;color:var(--text2);margin:0;line-height:1.4;}
+  .property-contacts-list{display:grid;gap:12px;}
+  .property-contact-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:14px;}
+  .property-contact-card .frow:last-child,.property-contact-card .fg:last-child{margin-bottom:0;}
+  .property-contact-remove{position:absolute;right:10px;top:10px;width:34px;height:34px;border:1px solid rgba(224,90,75,.3);background:rgba(224,90,75,.08);color:var(--red);border-radius:10px;cursor:pointer;font-weight:900;}
+  .property-contact-card-title{font-size:12px;color:var(--text2);font-weight:800;margin:0 44px 10px 0;text-transform:uppercase;letter-spacing:.05em;}
   .accounting-rules-modal{max-width:860px;}
   .rules-list{display:grid;gap:10px;margin:16px 0;}
   .rule-card{display:grid;grid-template-columns:34px minmax(145px,1fr) minmax(140px,1fr) minmax(135px,1fr) minmax(120px,1fr) 42px;gap:10px;align-items:end;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:12px;}
@@ -288,7 +303,7 @@
   .rule-card input[type="checkbox"]{width:18px;height:18px;accent-color:var(--green);}
   .rule-remove{width:38px;height:38px;border:1px solid var(--border);background:var(--surface);color:var(--red);border-radius:12px;cursor:pointer;font-weight:900;}
   .rule-remove:hover{border-color:rgba(224,90,75,.45);background:rgba(224,90,75,.08);}
-  @media(max-width:860px){.rule-card{grid-template-columns:34px 1fr 1fr}.rule-remove{grid-column:3}.journal-compact-table th:nth-child(3),.journal-compact-table td:nth-child(3){display:none}.journal-compact-table th:nth-child(1){width:92px}.journal-compact-table th:nth-child(4){width:116px}.journal-compact-table th:nth-child(5){width:64px}.journal-amount{font-size:15px}}
+  @media(max-width:860px){.rule-card{grid-template-columns:34px 1fr 1fr}.rule-remove{grid-column:3}.journal-compact-table th:nth-child(3),.journal-compact-table td:nth-child(3){display:none}.journal-compact-table th:nth-child(1){width:92px}.journal-compact-table th:nth-child(4){width:116px}.journal-compact-table th:nth-child(5){width:64px}.journal-amount{font-size:15px}.contact-profile-view{grid-template-columns:1fr}.contact-profile-field.wide{grid-column:auto}.property-contacts-head{flex-direction:column}.property-contacts-head button{width:100%}}
   .budget-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
   .budget-head h3{font-family:'Playfair Display',serif;font-size:20px;}
   .budget-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px;}
