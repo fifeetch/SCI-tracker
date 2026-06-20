@@ -145,10 +145,33 @@ async function seedIfEmpty(){
 async function deleteCollectionDocs(col){
   if(!canWrite()){ denyWrite(); throw new Error('Accès lecture seule'); }
   const snap = await colRef(col).get();
-  const batch = db.batch();
-  snap.docs.forEach(doc => batch.delete(doc.ref));
-  if(!snap.empty) await batch.commit();
+  const docs=snap.docs||[];
+  for(let i=0;i<docs.length;i+=450){
+    const batch=db.batch();
+    docs.slice(i,i+450).forEach(doc=>batch.delete(doc.ref));
+    await batch.commit();
+  }
   CACHE[col] = [];
+}
+
+function confirmDeleteAllJournalOps(){
+  if(!canWrite()){ denyWrite(); return; }
+  const count=(window.CACHE?.ops||[]).length;
+  if(!count){ toast('Le journal comptable est déjà vide.'); return; }
+  $('confirm-msg').textContent=`Supprimer définitivement les ${count} opération(s) du journal comptable de ${entityName()} ? Cette action est irréversible et concerne aussi les opérations masquées par les filtres.`;
+  $('confirm-ok').onclick=async()=>{
+    closeModal('m-confirm');
+    if(!canWrite()){ denyWrite(); return; }
+    try{
+      await deleteCollectionDocs('ops');
+      renderCompta();
+      toast(`${count} opération(s) supprimée(s) du journal ✓`);
+    }catch(err){
+      console.error('Erreur suppression complète du journal',err);
+      toast('Erreur suppression : '+formatFirebaseError(err));
+    }
+  };
+  openModal('m-confirm');
 }
 
 window.resetSCIData = async function(){

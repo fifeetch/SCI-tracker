@@ -401,6 +401,7 @@
     </div>
     <div class="compta-section-body">
       <div class="journal-table-actions">
+        <button class="btn-del write-only" onclick="confirmDeleteAllJournalOps()">🗑️ Tout supprimer</button>
         <button class="btn-out" onclick="exportComptaCSV()">⬇️ Export CSV</button>
         <button class="btn-out" onclick="exportComptaXLS()">📊 Export Excel</button>
         <button class="btn-out write-only" onclick="document.getElementById('import-ops-input').click()">⬆️ Import CSV</button>
@@ -1574,7 +1575,7 @@
 </nav>
 
 <!-- Firebase SDK déplacé dans le <head> -->
-<script src="app.js?v=20260620-quittance-logo"></script>
+<script src="app.js?v=20260620-journal-delete-all"></script>
 
 <!-- ══ APP — script classique, scope global ══ -->
 
