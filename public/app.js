@@ -62,7 +62,7 @@ window.emergencyLocalReset = emergencyLocalReset;
 let SCI_ID  = 'default';
 // V1.1.2 : on ne décide plus la SCI active depuis le localStorage.
 // La vraie source est Firestore users/{uid}.activeSci, chargée dans loadUserRole().
-const CACHE   = {biens:[],contacts:[],locataires:[],associes:[],ops:[],budgets:[],docs:[],echs:[],messages:[],decisions:[],pvs:[],pouvoirs:[],baux:[],activity:[],alerts:[],settings:[],pushTokens:[]};
+const CACHE   = {biens:[],locataires:[],associes:[],ops:[],budgets:[],docs:[],echs:[],messages:[],decisions:[],pvs:[],pouvoirs:[],baux:[],activity:[],alerts:[],settings:[],pushTokens:[]};
 const APP_STATE = { role:'associe', profile:null, scis:[], currentSCI:null };
 const _unsubs = [];
 function isGerant(){ return APP_STATE.role === 'gerant'; }
@@ -179,7 +179,7 @@ window.resetSCIData = async function(){
   const ok = confirm('Vider toutes les données de la structure active ? Biens, locataires, associés, opérations, documents, échéances, messages et décisions seront supprimés. Cette action est définitive.');
   if(!ok) return;
   try{
-    await Promise.all(['biens','contacts','locataires','associes','ops','budgets','docs','echs','messages','decisions','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'].map(deleteCollectionDocs));
+    await Promise.all(['biens','locataires','associes','ops','budgets','docs','echs','messages','decisions','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'].map(deleteCollectionDocs));
     window.SCIapp?.toast('Structure vidée ✓');
     window.SCIapp?.onData?.('reset');
   }catch(err){
@@ -195,7 +195,7 @@ async function startListeners(){
   try{ await firebase.auth().currentUser?.getIdToken(true); }catch(e){ console.warn('[SCI] token refresh', e); }
 
   const ACTIVE_SCI = SCI_ID;
-  const COLS = ['biens','contacts','locataires','associes','ops','budgets','docs','echs','messages','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'];
+  const COLS = ['biens','locataires','associes','ops','budgets','docs','echs','messages','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'];
 
   async function loadColFromServer(col){
     const snap = colRef(col).get ? await colRef(col).get({source:'server'}) : null;
@@ -1289,7 +1289,7 @@ const HOME_KPI_DEFS = [
   {key:'documents', icon:'📄', title:'Documents manquants', family:'Justificatifs'},
   {key:'votes', icon:'✓', title:'Votes ouverts', family:'Décision'},
   {key:'messages', icon:'💬', title:'Messages non lus', family:'Communication'},
-  {key:'echeances', icon:'⏱', title:'Échéances proches', family:'Agenda'},
+  {key:'echeances', icon:'⏱', title:'Événements proches', family:'Agenda'},
   {key:'prets', icon:'🏦', title:'Mensualités estimées', family:'Prêts'},
   {key:'alertes', icon:'!', title:'Alertes à traiter', family:'Priorité'},
   {key:'cashflow', icon:'↕', title:'Cash-flow mensuel', family:'Finance'},
@@ -1805,7 +1805,7 @@ function propertyLabelById(id){
 }
 function allPartners(){
   const map=new Map();
-  (window.CACHE?.contacts||[]).forEach(p=>{
+  (window.CACHE?.settings||[]).filter(p=>p?._kind==='partner').forEach(p=>{
     const item={...p,id:String(p.id),type:normalizedPartnerType(p.type),bienIds:Array.from(new Set((p.bienIds||[]).map(String)))};
     map.set(String(item.id),item);
   });
@@ -1874,11 +1874,11 @@ async function savePartner(){
   const rawId=v('partner-id');
   const draft={type:normalizedPartnerType(v('partner-type')),company:v('partner-company'),name:v('partner-name'),address:v('partner-address'),phone:v('partner-phone'),email:v('partner-email'),note:v('partner-note'),bienIds:selectedPartnerPropertyIds()};
   const duplicate=!rawId?allPartners().find(p=>partnerKey(p)===partnerKey(draft)):null;
-  const previous=EDITING_PARTNER_META||duplicate, id=rawId&&!String(rawId).startsWith('legacy-')?rawId:(duplicate&&!duplicate._legacy?String(duplicate.id):String(Date.now()));
+  const previous=EDITING_PARTNER_META||duplicate, id=rawId&&!String(rawId).startsWith('legacy-')?rawId:(duplicate&&!duplicate._legacy?String(duplicate.id):`partner-${Date.now()}`);
   const obj={id,...draft,bienIds:Array.from(new Set([...(duplicate?.bienIds||[]).map(String),...draft.bienIds]))};
   if(!(obj.company||obj.name)){ toast('Renseigne au moins la société ou le nom du partenaire.'); return; }
   try{
-    await window.dbSet?.('contacts',obj);
+    await window.dbSet?.('settings',{...obj,_kind:'partner'});
     await syncPartnerSnapshots(obj,previous?partnerKey(previous):'');
     toast(previous?'Partenaire mis à jour ✓':'Partenaire ajouté ✓'); closeModal('m-partner'); renderPartners();
   }catch(err){ console.error(err); toast(formatFirebaseError(err)); }
@@ -1889,7 +1889,7 @@ function confirmDeletePartner(){
   $('confirm-ok').onclick=async()=>{
     closeModal('m-confirm');
     try{
-      if(!p._legacy) await window.dbDel?.('contacts',p.id);
+      if(!p._legacy) await window.dbDel?.('settings',p.id);
       await syncPartnerSnapshots({...p,bienIds:[]},partnerKey(p));
       toast('Partenaire supprimé ✓'); closeModal('m-partner'); renderPartners();
     }catch(err){console.error(err);toast(formatFirebaseError(err));}
@@ -3452,7 +3452,7 @@ function propertyContactsSummaryHtml(b){
 function contactsForProperty(b){
   if(!b) return [];
   const merged=[], seen=new Set();
-  [...(Array.isArray(b.contacts)?b.contacts:[]),...(window.CACHE?.contacts||[]).filter(c=>(c.bienIds||[]).map(String).includes(String(b.id)))].forEach(c=>{
+  [...(Array.isArray(b.contacts)?b.contacts:[]),...(window.CACHE?.settings||[]).filter(c=>c?._kind==='partner'&&(c.bienIds||[]).map(String).includes(String(b.id)))].forEach(c=>{
     const key=String(c.id||partnerKey(c)); if(seen.has(key)) return; seen.add(key); merged.push({...c,type:normalizedPartnerType(c.type)});
   });
   return merged;
@@ -3463,14 +3463,14 @@ async function syncPropertyPartners(bienId,contacts){
   const used=new Set(), snapshots=[];
   for(let i=0;i<contacts.length;i++){
     const c=contacts[i], match=directory.find(p=>(c.id&&String(c.id)===String(p.id))||partnerKey(c)===partnerKey(p));
-    const id=match&&!match._legacy?String(match.id):String(Date.now()+i);
+    const id=match&&!match._legacy?String(match.id):`partner-${Date.now()+i}`;
     const obj={id,type:normalizedPartnerType(c.type),company:c.company||'',name:c.name||'',address:c.address||'',phone:c.phone||'',email:c.email||'',note:c.note||'',bienIds:Array.from(new Set([...(match?.bienIds||[]).map(String),String(bienId)]))};
-    await window.dbSet?.('contacts',obj); used.add(id);
+    await window.dbSet?.('settings',{...obj,_kind:'partner'}); used.add(id);
     const {bienIds:_linkedBienIds,...snapshot}=obj; snapshots.push(snapshot);
   }
   for(const p of current){
     if(p._legacy||used.has(String(p.id))) continue;
-    await window.dbSet?.('contacts',{...p,bienIds:(p.bienIds||[]).map(String).filter(x=>x!==String(bienId))});
+    await window.dbSet?.('settings',{...p,_kind:'partner',bienIds:(p.bienIds||[]).map(String).filter(x=>x!==String(bienId))});
   }
   return snapshots;
 }
@@ -4817,7 +4817,7 @@ async function refreshAssocPartsOnStructureCards(scis){
   };
 
   window.exportApplicationJSON=function(){
-    const payload={exportedAt:new Date().toISOString(),structure:entityName(),data:{biens:safeRows(window.CACHE?.biens),partenaires:safeRows(window.CACHE?.contacts),locataires:safeRows(window.CACHE?.locataires),associes:safeRows(window.CACHE?.associes),operations:safeRows(window.CACHE?.ops),budgets:safeRows(window.CACHE?.budgets),documents:safeRows(window.CACHE?.docs).map(d=>({...d,dataUrl:undefined})),messages:safeRows(window.CACHE?.messages),decisions:safeRows(window.CACHE?.decisions),echeances:safeRows(window.CACHE?.echs),baux:safeRows(window.CACHE?.baux),settings:safeRows(window.CACHE?.settings)}};
+    const payload={exportedAt:new Date().toISOString(),structure:entityName(),data:{biens:safeRows(window.CACHE?.biens),partenaires:safeRows(allPartners()),locataires:safeRows(window.CACHE?.locataires),associes:safeRows(window.CACHE?.associes),operations:safeRows(window.CACHE?.ops),budgets:safeRows(window.CACHE?.budgets),documents:safeRows(window.CACHE?.docs).map(d=>({...d,dataUrl:undefined})),messages:safeRows(window.CACHE?.messages),decisions:safeRows(window.CACHE?.decisions),echeances:safeRows(window.CACHE?.echs),baux:safeRows(window.CACHE?.baux),settings:safeRows(window.CACHE?.settings)}};
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a');
     a.href=url; a.download='sci-family-export-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); toast('Sauvegarde JSON créée ✓');
   };
@@ -4826,7 +4826,7 @@ async function refreshAssocPartsOnStructureCards(scis){
     if(typeof XLSX==='undefined'){ toast('Librairie Excel non chargée'); return; }
     const wb=XLSX.utils.book_new();
     const sheets={
-      'Biens':safeRows(window.CACHE?.biens),'Partenaires':safeRows(window.CACHE?.contacts),'Locataires':safeRows(window.CACHE?.locataires),'Associes':safeRows(window.CACHE?.associes),'Operations':safeRows(window.CACHE?.ops),'Budget':safeRows(window.CACHE?.budgets),'Documents':safeRows(window.CACHE?.docs).map(d=>({id:d.id,nom:d.name,type:d.type,date:d.date,bien:d.bien,associe:d.associe,locataire:d.locataire,taille:d.size,stockage:d.storageMode,transmisComptable:d.sentAccountant?'oui':'non'})),'Messages':safeRows(window.CACHE?.messages),'Decisions':safeRows(window.CACHE?.decisions).map(d=>({id:d.id,titre:decTitle(d),type:d.type,statut:d.status,deadline:d.deadline,montant:d.montant,description:d.description,votes:safeRows(d.votes).length})),'Echeances_AG':safeRows(window.CACHE?.echs),'Baux_GFA':safeRows(window.CACHE?.baux)
+      'Biens':safeRows(window.CACHE?.biens),'Partenaires':safeRows(allPartners()),'Locataires':safeRows(window.CACHE?.locataires),'Associes':safeRows(window.CACHE?.associes),'Operations':safeRows(window.CACHE?.ops),'Budget':safeRows(window.CACHE?.budgets),'Documents':safeRows(window.CACHE?.docs).map(d=>({id:d.id,nom:d.name,type:d.type,date:d.date,bien:d.bien,associe:d.associe,locataire:d.locataire,taille:d.size,stockage:d.storageMode,transmisComptable:d.sentAccountant?'oui':'non'})),'Messages':safeRows(window.CACHE?.messages),'Decisions':safeRows(window.CACHE?.decisions).map(d=>({id:d.id,titre:decTitle(d),type:d.type,statut:d.status,deadline:d.deadline,montant:d.montant,description:d.description,votes:safeRows(d.votes).length})),'Echeances_AG':safeRows(window.CACHE?.echs),'Baux_GFA':safeRows(window.CACHE?.baux)
     };
     Object.entries(sheets).forEach(([name,rows])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{info:'Aucune donnée'}]),name.slice(0,31)));
     XLSX.writeFile(wb,'sci-family-export-complet-'+new Date().toISOString().slice(0,10)+'.xlsx'); toast('Export Excel complet créé ✓');
@@ -5185,7 +5185,7 @@ async function refreshAssocPartsOnStructureCards(scis){
       comptabilite: rows(cache.ops),
       budget: rows(cache.budgets),
       biens: rows(cache.biens),
-      partenaires: rows(cache.contacts),
+      partenaires: typeof window.allPartners === 'function' ? rows(window.allPartners()) : rows(cache.settings).filter(function(x){ return x && x._kind === 'partner'; }),
       locataires: rows(cache.locataires),
       documents: rows(cache.docs).map(cloneWithoutHeavyFiles),
       associes: rows(cache.associes),

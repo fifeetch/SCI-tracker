@@ -57,12 +57,12 @@
   <nav class="main-nav main-nav-general">
     <div class="nav-item nav-zone-pill"><button class="active" data-page="home" onclick="goPage(isGFAContext() ? 'gfa' : 'home')">Accueil</button></div>
     <div class="nav-item"><button data-page="biens" onclick="goPage('biens')">Biens</button></div>
-    <div class="nav-item"><button data-page="partenaires" onclick="goPage('partenaires')">Partenaires</button></div>
     <div class="nav-item" data-sci-only="locataires"><button data-page="locataires" data-sci-only="locataires" onclick="goPage('locataires')">Locataires</button></div>
     <div class="nav-item nav-zone-pill"><button data-page="compta" onclick="goPage('compta')">Comptabilité</button></div>
-    <div class="nav-item"><button data-page="documents" onclick="goPage('documents')">Documents</button></div>
+    <div class="nav-item"><button data-page="partenaires" onclick="goPage('partenaires')">Partenaires</button></div>
     <div class="nav-item"><button data-page="associes" onclick="goPage('associes')">Vie de la SCI</button></div>
-    <div class="nav-item"><button data-page="echeances" onclick="goPage('echeances')" id="nav-ech">Échéances</button></div>
+    <div class="nav-item"><button data-page="documents" onclick="goPage('documents')">Documents</button></div>
+    <div class="nav-item"><button data-page="echeances" onclick="goPage('echeances')" id="nav-ech">Agenda</button></div>
     <div class="nav-item"><button data-page="communication" onclick="goPage('communication')">Messages</button></div>
   </nav>
   <div class="hdr-right">
@@ -131,16 +131,16 @@
         <div class="tile" onclick="goPage('compta')"><div class="tile-icon"><svg class="v2-icon" viewBox="0 0 96 96" aria-hidden="true"><rect x="18" y="48" width="13" height="28" rx="3" fill="#bfe2dc"/><rect x="38" y="34" width="13" height="42" rx="3" fill="#6fc0ad"/><rect x="58" y="43" width="13" height="33" rx="3" fill="#8fd0c3"/><rect x="78" y="22" width="13" height="54" rx="3" fill="#159a7f"/><circle cx="24" cy="57" r="2.6" fill="#167b70"/><circle cx="44" cy="44" r="2.6" fill="#167b70"/><circle cx="64" cy="53" r="2.6" fill="#167b70"/></svg></div><h3>Comptabilité</h3><p>Recettes, charges, budget prévisionnel.</p></div>
         <div class="tile" onclick="goPage('documents')"><div class="tile-icon"><svg class="v2-icon" viewBox="0 0 96 96" aria-hidden="true"><rect x="28" y="18" width="42" height="58" rx="6" fill="rgba(142,202,230,.18)" stroke="currentColor" stroke-width="4"/><path d="M38 36h22M38 49h18M38 62h24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M23 25h8v57h46" fill="none" stroke="rgba(47,110,203,.45)" stroke-width="3" stroke-linecap="round"/></svg></div><h3>Documents</h3><p>Contrats, diagnostics, photos.</p></div>
         <div class="tile" onclick="goPage('associes')"><div class="tile-icon"><svg class="v2-icon" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="24" r="11" fill="rgba(185,167,255,.18)" stroke="currentColor" stroke-width="4"/><circle cx="23" cy="58" r="10" fill="rgba(185,167,255,.18)" stroke="currentColor" stroke-width="4"/><circle cx="73" cy="58" r="10" fill="rgba(185,167,255,.18)" stroke="currentColor" stroke-width="4"/><path d="M40 35 27 49M56 35l13 14M34 62h28" stroke="currentColor" stroke-width="3" stroke-dasharray="5 5" stroke-linecap="round"/><path d="M37 78h22" stroke="#8b6fe8" stroke-width="6" stroke-linecap="round"/></svg></div><h3>Vie de la SCI</h3><p>Parts, rôles, décisions et votes.</p></div>
-        <div class="tile" onclick="goPage('echeances')" style="border-color:rgba(224,90,75,.3)"><div class="tile-icon"><svg class="v2-icon" viewBox="0 0 96 96" aria-hidden="true"><rect x="22" y="20" width="52" height="50" rx="7" fill="rgba(245,166,35,.11)" stroke="currentColor" stroke-width="4"/><path d="M22 34h52M35 16v12M61 16v12" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><g fill="#f5a623"><circle cx="35" cy="46" r="3"/><circle cx="48" cy="46" r="3"/><circle cx="61" cy="46" r="3"/><circle cx="35" cy="58" r="3"/><circle cx="48" cy="58" r="3"/><circle cx="61" cy="58" r="3"/></g><path d="M50 75 76 62" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></div><h3>Échéances</h3><p>Fins de bail, révisions IRL, loyers, déclarations.</p></div>
+        <div class="tile" onclick="goPage('echeances')" style="border-color:rgba(224,90,75,.3)"><div class="tile-icon"><svg class="v2-icon" viewBox="0 0 96 96" aria-hidden="true"><rect x="22" y="20" width="52" height="50" rx="7" fill="rgba(245,166,35,.11)" stroke="currentColor" stroke-width="4"/><path d="M22 34h52M35 16v12M61 16v12" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><g fill="#f5a623"><circle cx="35" cy="46" r="3"/><circle cx="48" cy="46" r="3"/><circle cx="61" cy="46" r="3"/><circle cx="35" cy="58" r="3"/><circle cx="48" cy="58" r="3"/><circle cx="61" cy="58" r="3"/></g><path d="M50 75 76 62" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></div><h3>Agenda</h3><p>Fins de bail, révisions IRL, loyers, déclarations.</p></div>
         <div class="tile" onclick="goPage('communication')"><div class="tile-icon"><svg class="v2-icon" viewBox="0 0 96 96" aria-hidden="true"><rect x="17" y="22" width="52" height="31" rx="10" fill="rgba(142,202,230,.18)" stroke="currentColor" stroke-width="4"/><path d="M30 53 20 66V52" fill="rgba(142,202,230,.18)" stroke="currentColor" stroke-width="3"/><rect x="44" y="52" width="35" height="22" rx="9" fill="rgba(142,202,230,.22)" stroke="currentColor" stroke-width="3"/><path d="M68 74 80 82v-12" fill="rgba(142,202,230,.22)" stroke="currentColor" stroke-width="3"/><circle cx="32" cy="38" r="3"/><circle cx="44" cy="38" r="3"/><circle cx="56" cy="38" r="3"/></svg></div><h3>Communication</h3><p>Messages internes entre associés.</p></div>
         <div class="tile" onclick="openAlertsModal()" style="border-color:rgba(224,90,75,.35)"><div class="tile-icon"><svg class="v2-icon v2-alert" viewBox="0 0 96 96" aria-hidden="true"><path d="M48 16 84 78H12Z" fill="rgba(224,90,75,.08)" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M48 35v21" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><circle cx="48" cy="66" r="3.8" fill="currentColor"/></svg></div><h3>Alertes à traiter</h3><p>Votes, messages et documents importants.</p></div>
           </div>
 
   <div class="home-wide-panels">
         <section class="home-mini-panel">
-          <div class="home-panel-title"><h3>Échéances & alertes agenda</h3><button class="btn-out btn-sm" onclick="goPage('echeances')">Calendrier</button></div>
+          <div class="home-panel-title"><h3>Agenda & alertes</h3><button class="btn-out btn-sm" onclick="goPage('echeances')">Calendrier</button></div>
           <div class="home-agenda-list" id="home-agenda-list">
-            <div class="home-agenda-item"><div><strong>Chargement…</strong><br><span>Échéances à venir</span></div><small>—</small></div>
+            <div class="home-agenda-item"><div><strong>Chargement…</strong><br><span>Événements à venir</span></div><small>—</small></div>
           </div>
         </section>
         <section class="home-mini-panel">
@@ -184,7 +184,7 @@
             </div>
             <div class="home-kpi-card orange" data-kpi="echeances" onclick="goPage('echeances')">
               <div class="k-top"><div class="k-icon">⏱</div><small>Agenda</small></div>
-              <div><strong id="s-urg">—</strong><span>Échéances proches</span></div>
+              <div><strong id="s-urg">—</strong><span>Événements proches</span></div>
             </div>
             <div class="home-kpi-card" data-kpi="votes" onclick="goPage('associes')">
               <div class="k-top"><div class="k-icon">✓</div><small>Décision</small></div>
@@ -292,7 +292,7 @@
     </div>
     <div class="gfa-focus-card" onclick="goPage('echeances')">
       <div class="gfa-card-icon echeances">📅</div>
-      <span>Échéances</span>
+      <span>Agenda</span>
       <strong id="gfa-ech">—</strong>
       <p>Renouvellements, taxes, indexations et rappels à venir.</p>
     </div>
@@ -999,7 +999,7 @@
             <option value="locataires">Locataires</option>
             <option value="documents">Documents</option>
             <option value="associes">Associés</option>
-            <option value="echeances">Échéances</option>
+            <option value="echeances">Agenda</option>
             <option value="messages">Messages</option>
             <option value="decisions">Décisions / votes</option>
             <option value="assembleesGenerales">Assemblées générales</option>
@@ -1076,7 +1076,7 @@
 <div id="page-echeances" class="page">
   <div class="back-btn" onclick="goPage('home')">Retour</div>
   <div class="sec-hdr">
-    <div><h2>Échéances</h2><p>Tous les événements classés par urgence</p></div>
+    <div><h2>Agenda</h2><p>Tous les événements classés par urgence</p></div>
     <button class="btn write-only" onclick="openEchModal(null)">+ Ajouter</button>
   </div>
   <div class="cal-nav">
@@ -1675,7 +1675,7 @@
 </nav>
 
 <!-- Firebase SDK déplacé dans le <head> -->
-<script src="app.js?v=20260621-partners-directory"></script>
+<script src="app.js?v=20260621-partners-rights-menu"></script>
 
 <!-- ══ APP — script classique, scope global ══ -->
 
