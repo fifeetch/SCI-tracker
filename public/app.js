@@ -62,7 +62,7 @@ window.emergencyLocalReset = emergencyLocalReset;
 let SCI_ID  = 'default';
 // V1.1.2 : on ne décide plus la SCI active depuis le localStorage.
 // La vraie source est Firestore users/{uid}.activeSci, chargée dans loadUserRole().
-const CACHE   = {biens:[],locataires:[],associes:[],ops:[],budgets:[],docs:[],echs:[],messages:[],decisions:[],pvs:[],pouvoirs:[],baux:[],activity:[],alerts:[],settings:[],pushTokens:[]};
+const CACHE   = {biens:[],contacts:[],locataires:[],associes:[],ops:[],budgets:[],docs:[],echs:[],messages:[],decisions:[],pvs:[],pouvoirs:[],baux:[],activity:[],alerts:[],settings:[],pushTokens:[]};
 const APP_STATE = { role:'associe', profile:null, scis:[], currentSCI:null };
 const _unsubs = [];
 function isGerant(){ return APP_STATE.role === 'gerant'; }
@@ -179,7 +179,7 @@ window.resetSCIData = async function(){
   const ok = confirm('Vider toutes les données de la structure active ? Biens, locataires, associés, opérations, documents, échéances, messages et décisions seront supprimés. Cette action est définitive.');
   if(!ok) return;
   try{
-    await Promise.all(['biens','locataires','associes','ops','budgets','docs','echs','messages','decisions','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'].map(deleteCollectionDocs));
+    await Promise.all(['biens','contacts','locataires','associes','ops','budgets','docs','echs','messages','decisions','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'].map(deleteCollectionDocs));
     window.SCIapp?.toast('Structure vidée ✓');
     window.SCIapp?.onData?.('reset');
   }catch(err){
@@ -195,7 +195,7 @@ async function startListeners(){
   try{ await firebase.auth().currentUser?.getIdToken(true); }catch(e){ console.warn('[SCI] token refresh', e); }
 
   const ACTIVE_SCI = SCI_ID;
-  const COLS = ['biens','locataires','associes','ops','budgets','docs','echs','messages','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'];
+  const COLS = ['biens','contacts','locataires','associes','ops','budgets','docs','echs','messages','pvs','pouvoirs','baux','activity','alerts','settings','pushTokens'];
 
   async function loadColFromServer(col){
     const snap = colRef(col).get ? await colRef(col).get({source:'server'}) : null;
@@ -905,7 +905,7 @@ function goPage(id){
   document.querySelectorAll('header nav button').forEach(b=>{b.classList.toggle('active', b.dataset.page===navActiveId);});
   document.querySelectorAll('.mnav-btn').forEach(b=>b.classList.remove('active'));
   const mb=$('mn-'+id);if(mb)mb.classList.add('active');
-  ({'mes-scis':renderMesSCIs,home:renderHome,gfa:renderGFA,biens:renderBiens,baux:renderBaux,locataires:renderLoc,compta:renderCompta,comptable:renderComptable,documents:renderDocs,associes:()=>{renderAssoc();renderDecisions();},echeances:renderEch,communication:renderCommunication,decisions:()=>goPage('associes'),parametres:renderParametres})[id]?.();
+  ({'mes-scis':renderMesSCIs,home:renderHome,gfa:renderGFA,biens:renderBiens,partenaires:renderPartners,baux:renderBaux,locataires:renderLoc,compta:renderCompta,comptable:renderComptable,documents:renderDocs,associes:()=>{renderAssoc();renderDecisions();},echeances:renderEch,communication:renderCommunication,decisions:()=>goPage('associes'),parametres:renderParametres})[id]?.();
   applyRoleUI();
 }
 
@@ -1784,6 +1784,117 @@ function renderBiens(){
       ${propertyContactsSummaryHtml(b)}
       ${linkedDocsHTML(b)}
     </div>`).join(''):'<p style="color:var(--text2);padding:20px">Aucun bien enregistré.</p>';
+}
+
+// ══ PARTENAIRES / RÉSEAU DE LA SCI ══
+const PARTNER_TYPES=['Banquier','Assureur','Notaire','Syndic','Agence immobilière','Comptable','Artisan / prestataire','Autre'];
+const PARTNER_ICONS={'Banquier':'🏦','Assureur':'🛡️','Notaire':'⚖️','Syndic':'🏢','Agence immobilière':'🏠','Comptable':'🧮','Artisan / prestataire':'🛠️','Autre':'🤝'};
+let PARTNER_FILTER='Tous', EDITING_PARTNER_META=null;
+function normalizedPartnerType(type){
+  const raw=String(type||'Autre').trim();
+  if(raw==='Assurance') return 'Assureur';
+  if(raw==='Agence Immo') return 'Agence immobilière';
+  return PARTNER_TYPES.includes(raw)?raw:'Autre';
+}
+function partnerKey(p){
+  return normalizeText([normalizedPartnerType(p?.type),p?.company,p?.name,p?.email,p?.phone].join('|'));
+}
+function propertyLabelById(id){
+  const b=(window.CACHE?.biens||[]).find(x=>String(x.id)===String(id));
+  return b?(isGFAContext()?(b.cadastre||b.adr||'Parcelle'):(b.adr||'Bien')):'Bien';
+}
+function allPartners(){
+  const map=new Map();
+  (window.CACHE?.contacts||[]).forEach(p=>{
+    const item={...p,id:String(p.id),type:normalizedPartnerType(p.type),bienIds:Array.from(new Set((p.bienIds||[]).map(String)))};
+    map.set(String(item.id),item);
+  });
+  (window.CACHE?.biens||[]).forEach(b=>(Array.isArray(b.contacts)?b.contacts:[]).forEach((c,i)=>{
+    if(!c||!Object.entries(c).some(([k,val])=>k!=='type'&&!!val)) return;
+    const type=normalizedPartnerType(c.type), key=partnerKey({...c,type});
+    const existing=Array.from(map.values()).find(p=>String(c.id||'')===String(p.id)||partnerKey(p)===key);
+    if(existing){ existing.bienIds=Array.from(new Set([...(existing.bienIds||[]),String(b.id)])); return; }
+    const id=String(c.id||`legacy-${b.id}-${i}`);
+    map.set(id,{...c,id,type,bienIds:[String(b.id)],_legacy:true});
+  }));
+  return Array.from(map.values());
+}
+function partnerCategoryClass(type){
+  return ({Banquier:'banquier',Assureur:'assureur',Notaire:'notaire',Syndic:'syndic','Agence immobilière':'agence',Comptable:'comptable','Artisan / prestataire':'artisan',Autre:'autre'})[normalizedPartnerType(type)]||'autre';
+}
+function setPartnerFilter(type){ PARTNER_FILTER=type; renderPartners(); }
+function renderPartners(){
+  const all=allPartners();
+  const q=normalizeText($('partners-search')?.value||'');
+  const visible=all.filter(p=>(PARTNER_FILTER==='Tous'||p.type===PARTNER_FILTER)&&(!q||normalizeText([p.type,p.company,p.name,p.address,p.phone,p.email,p.note,(p.bienIds||[]).map(propertyLabelById).join(' ')].join(' ')).includes(q)));
+  const set=(id,val)=>{const el=$(id);if(el)el.textContent=val;};
+  set('partners-count',all.length); set('partners-category-count',new Set(all.map(p=>p.type)).size); set('partners-property-count',new Set(all.flatMap(p=>p.bienIds||[])).size);
+  const filters=$('partners-filters');
+  if(filters) filters.innerHTML=['Tous',...PARTNER_TYPES].map(t=>`<button class="partner-filter${PARTNER_FILTER===t?' active':''}" onclick="setPartnerFilter('${esc(t)}')">${t==='Tous'?'Tous':(PARTNER_ICONS[t]+' '+t)}</button>`).join('');
+  const grid=$('partners-grid');
+  if(grid) grid.innerHTML=visible.length?visible.map(p=>{
+    const props=(p.bienIds||[]).map(propertyLabelById);
+    return `<article class="partner-card cat-${partnerCategoryClass(p.type)}" onclick="openPartnerModal('${esc(p.id)}')">
+      <div class="partner-card-head"><div class="partner-icon">${PARTNER_ICONS[p.type]||'🤝'}</div><div><div class="partner-card-title">${esc(p.company||p.name||'Partenaire')}</div><div class="partner-card-person">${esc(p.name||'Interlocuteur à préciser')}</div><span class="partner-category">${esc(p.type)}</span></div></div>
+      <div class="partner-contact-line"><span>☎</span><span>${esc(p.phone||'Téléphone à compléter')}</span></div>
+      <div class="partner-contact-line"><span>✉</span><span>${esc(p.email||'Email à compléter')}</span></div>
+      <div class="partner-property-pills">${props.length?props.slice(0,3).map(x=>`<span class="partner-property-pill">🏢 ${esc(x)}</span>`).join(''):'<span class="partner-property-pill">Aucun bien rattaché</span>'}${props.length>3?`<span class="partner-property-pill">+${props.length-3}</span>`:''}</div>
+      <div class="partner-card-foot"><span>Voir la fiche</span><span>→</span></div>
+    </article>`;
+  }).join(''):'<div class="partners-empty">Aucun partenaire ne correspond à cette recherche.</div>';
+  const incomplete=all.filter(p=>!(p.phone||p.email)||!(p.bienIds||[]).length||!(p.company||p.name));
+  const side=$('partners-incomplete-list');
+  if(side) side.innerHTML=incomplete.length?incomplete.slice(0,8).map(p=>`<div class="partner-incomplete-item" onclick="openPartnerModal('${esc(p.id)}')"><strong>${esc(p.company||p.name||p.type)}</strong><span>${!(p.phone||p.email)?'Coordonnées manquantes':(!(p.bienIds||[]).length?'Aucun bien rattaché':'Identité à compléter')}</span></div>`).join(''):'<div class="contact-profile-empty">Toutes les fiches sont complètes ✓</div>';
+}
+function renderPartnerPropertyChoices(selected=[]){
+  const box=$('partner-properties'); if(!box) return; const set=new Set((selected||[]).map(String));
+  const biens=window.CACHE?.biens||[];
+  box.innerHTML=biens.length?biens.map(b=>`<label class="partner-property-choice"><input type="checkbox" value="${esc(b.id)}" ${set.has(String(b.id))?'checked':''}>${esc(isGFAContext()?(b.cadastre||b.adr||'Parcelle'):(b.adr||'Bien'))}</label>`).join(''):'<span class="small-help">Aucun bien enregistré.</span>';
+}
+function openPartnerModal(id){
+  if(!canWrite()){ denyWrite(); return; }
+  const p=id!=null?allPartners().find(x=>String(x.id)===String(id)):null; EDITING_PARTNER_META=p||null;
+  $('mpartner-t').innerHTML=p?'🤝 Modifier le partenaire &nbsp;<span class="mbadge">Édition</span>':'🤝 Nouveau partenaire';
+  $('partner-del').style.display=p?'block':'none';
+  sv('partner-id',p?.id||''); sv('partner-type',p?.type||'Autre'); sv('partner-company',p?.company||''); sv('partner-name',p?.name||''); sv('partner-address',p?.address||''); sv('partner-phone',p?.phone||''); sv('partner-email',p?.email||''); sv('partner-note',p?.note||'');
+  renderPartnerPropertyChoices(p?.bienIds||[]); openModal('m-partner');
+}
+function selectedPartnerPropertyIds(){ return Array.from(document.querySelectorAll('#partner-properties input:checked')).map(x=>String(x.value)); }
+async function syncPartnerSnapshots(partner, previousKey=''){
+  const selected=new Set((partner.bienIds||[]).map(String));
+  for(const b of (window.CACHE?.biens||[])){
+    const before=Array.isArray(b.contacts)?b.contacts:[];
+    const filtered=before.filter(c=>String(c.id||'')!==String(partner.id)&&(!previousKey||partnerKey(c)!==previousKey));
+    const contacts=selected.has(String(b.id))?[...filtered,{id:partner.id,type:partner.type,company:partner.company,name:partner.name,address:partner.address,phone:partner.phone,email:partner.email,note:partner.note}]:filtered;
+    if(JSON.stringify(contacts)!==JSON.stringify(before)) await window.dbSet?.('biens',{...b,contacts});
+  }
+}
+async function savePartner(){
+  if(!canWrite()){ denyWrite(); return; }
+  const rawId=v('partner-id');
+  const draft={type:normalizedPartnerType(v('partner-type')),company:v('partner-company'),name:v('partner-name'),address:v('partner-address'),phone:v('partner-phone'),email:v('partner-email'),note:v('partner-note'),bienIds:selectedPartnerPropertyIds()};
+  const duplicate=!rawId?allPartners().find(p=>partnerKey(p)===partnerKey(draft)):null;
+  const previous=EDITING_PARTNER_META||duplicate, id=rawId&&!String(rawId).startsWith('legacy-')?rawId:(duplicate&&!duplicate._legacy?String(duplicate.id):String(Date.now()));
+  const obj={id,...draft,bienIds:Array.from(new Set([...(duplicate?.bienIds||[]).map(String),...draft.bienIds]))};
+  if(!(obj.company||obj.name)){ toast('Renseigne au moins la société ou le nom du partenaire.'); return; }
+  try{
+    await window.dbSet?.('contacts',obj);
+    await syncPartnerSnapshots(obj,previous?partnerKey(previous):'');
+    toast(previous?'Partenaire mis à jour ✓':'Partenaire ajouté ✓'); closeModal('m-partner'); renderPartners();
+  }catch(err){ console.error(err); toast(formatFirebaseError(err)); }
+}
+function confirmDeletePartner(){
+  const p=EDITING_PARTNER_META; if(!p) return;
+  $('confirm-msg').textContent=`Supprimer définitivement ${p.company||p.name||'ce partenaire'} et le retirer des biens rattachés ?`;
+  $('confirm-ok').onclick=async()=>{
+    closeModal('m-confirm');
+    try{
+      if(!p._legacy) await window.dbDel?.('contacts',p.id);
+      await syncPartnerSnapshots({...p,bienIds:[]},partnerKey(p));
+      toast('Partenaire supprimé ✓'); closeModal('m-partner'); renderPartners();
+    }catch(err){console.error(err);toast(formatFirebaseError(err));}
+  };
+  openModal('m-confirm');
 }
 
 function renderLoc(){
@@ -3306,17 +3417,17 @@ function setBienModalMode(b={}){
   if(stat) stat.innerHTML=gfa?'<option>Exploitée</option><option>Louée</option><option>Libre</option><option>Boisée</option><option>En travaux</option>':'<option>Loué</option><option>Vacant</option><option>En travaux</option>';
   if(dpe) dpe.innerHTML=gfa?'<option>Agricole</option><option>Prairie</option><option>Bois</option><option>Bâti rural</option><option>Mixte</option><option>Autre</option>':'<option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option>';
 }
-const PROPERTY_CONTACT_TYPES=['Syndic','Agence immobilière','Assurance','Notaire','Artisan / prestataire','Autre'];
+const PROPERTY_CONTACT_TYPES=PARTNER_TYPES;
 function collectPropertyContacts(includeEmpty=false){
   const contacts=Array.from(document.querySelectorAll('#b-contacts-list .property-contact-card')).map(card=>{
     const get=key=>card.querySelector(`[data-contact-field="${key}"]`)?.value?.trim()||'';
-    return {type:get('type'),company:get('company'),name:get('name'),address:get('address'),phone:get('phone'),email:get('email'),note:get('note')};
+    return {id:card.dataset.contactId||'',type:get('type'),company:get('company'),name:get('name'),address:get('address'),phone:get('phone'),email:get('email'),note:get('note')};
   });
-  return includeEmpty?contacts:contacts.filter(c=>Object.entries(c).some(([key,value])=>key!=='type'&&!!value));
+  return includeEmpty?contacts:contacts.filter(c=>Object.entries(c).some(([key,value])=>!['id','type'].includes(key)&&!!value));
 }
 function renderPropertyContacts(contacts=[]){
   const box=$('b-contacts-list'); if(!box) return;
-  box.innerHTML=contacts.length?contacts.map((c,i)=>`<div class="property-contact-card">
+  box.innerHTML=contacts.length?contacts.map((c,i)=>`<div class="property-contact-card" data-contact-id="${esc(c.id||'')}">
     <button class="property-contact-remove" type="button" title="Supprimer cet interlocuteur" onclick="removePropertyContact(${i})">×</button>
     <div class="property-contact-card-title">Interlocuteur ${i+1}</div>
     <div class="frow"><div class="fg"><label>Type</label><select data-contact-field="type">${PROPERTY_CONTACT_TYPES.map(t=>`<option${t===(c.type||'Syndic')?' selected':''}>${esc(t)}</option>`).join('')}</select></div><div class="fg"><label>Institution / société</label><input data-contact-field="company" type="text" value="${esc(c.company||'')}" placeholder="Nom de l’organisme"></div></div>
@@ -3338,23 +3449,52 @@ function propertyContactsSummaryHtml(b){
   if(!contacts.length) return '';
   return `<div class="divider"></div><div style="font-size:12px;color:var(--text2);margin-bottom:6px">Interlocuteurs (${contacts.length})</div>${contacts.slice(0,3).map(c=>`<div class="info-row"><span>${esc(c.type||'Contact')}</span><span>${esc(c.company||c.name||c.email||c.phone||'—')}</span></div>`).join('')}`;
 }
+function contactsForProperty(b){
+  if(!b) return [];
+  const merged=[], seen=new Set();
+  [...(Array.isArray(b.contacts)?b.contacts:[]),...(window.CACHE?.contacts||[]).filter(c=>(c.bienIds||[]).map(String).includes(String(b.id)))].forEach(c=>{
+    const key=String(c.id||partnerKey(c)); if(seen.has(key)) return; seen.add(key); merged.push({...c,type:normalizedPartnerType(c.type)});
+  });
+  return merged;
+}
+async function syncPropertyPartners(bienId,contacts){
+  const directory=allPartners();
+  const current=directory.filter(p=>(p.bienIds||[]).map(String).includes(String(bienId)));
+  const used=new Set(), snapshots=[];
+  for(let i=0;i<contacts.length;i++){
+    const c=contacts[i], match=directory.find(p=>(c.id&&String(c.id)===String(p.id))||partnerKey(c)===partnerKey(p));
+    const id=match&&!match._legacy?String(match.id):String(Date.now()+i);
+    const obj={id,type:normalizedPartnerType(c.type),company:c.company||'',name:c.name||'',address:c.address||'',phone:c.phone||'',email:c.email||'',note:c.note||'',bienIds:Array.from(new Set([...(match?.bienIds||[]).map(String),String(bienId)]))};
+    await window.dbSet?.('contacts',obj); used.add(id);
+    const {bienIds:_linkedBienIds,...snapshot}=obj; snapshots.push(snapshot);
+  }
+  for(const p of current){
+    if(p._legacy||used.has(String(p.id))) continue;
+    await window.dbSet?.('contacts',{...p,bienIds:(p.bienIds||[]).map(String).filter(x=>x!==String(bienId))});
+  }
+  return snapshots;
+}
 function openBienModal(id){
   const e=id!=null,b=e?(window.CACHE?.biens||[]).find(x=>String(x.id)===String(id)):null;
   setBienModalMode(b||{});
   $('mbien-t').innerHTML=e?(isGFAContext()?'🌾 Modifier la parcelle &nbsp;<span class="mbadge">Édition</span>':'🏠 Modifier le bien &nbsp;<span class="mbadge">Édition</span>'):(isGFAContext()?'🌾 Nouvelle parcelle':'🏠 Nouveau bien');
   $('b-del').style.display=e?'block':'none';
   fillParcelleBauxSelect(b?.bailId||'');
-  renderPropertyContacts(Array.isArray(b?.contacts)?b.contacts:[]);
+  renderPropertyContacts(contactsForProperty(b));
   if(e&&b){sv('b-id',b.id);sv('b-adr',b.adr);sv('b-type',b.type);sv('b-surf',b.surf);sv('b-val',b.val);sv('b-loyer',b.loyer);sv('b-stat',b.stat);sv('b-dpe',b.dpe);sv('b-notes',b.notes||'');sv('b-commune',b.commune||'');sv('b-cadastre',b.cadastre||'');sv('b-nature',b.nature||'Terre agricole');sv('b-exploitant',b.exploitant||'');sv('b-type-bail',b.typeBail||'Non louée');sv('b-bail-id',b.bailId||'');}
   else{['b-id','b-adr','b-surf','b-val','b-loyer','b-notes','b-commune','b-cadastre','b-exploitant'].forEach(f=>sv(f,''));sv('b-type',isGFAContext()?'Terre agricole':'Appartement');sv('b-stat',isGFAContext()?'Exploitée':'Loué');sv('b-dpe',isGFAContext()?'Agricole':'C');sv('b-nature','Terre agricole');sv('b-type-bail','Non louée');sv('b-bail-id','');}
   openModal('m-bien');
 }
 async function saveBien(){
   const id=v('b-id'),e=!!id;
-  const base={id:e?+id:Date.now(),adr:v('b-adr'),type:v('b-type'),surf:+v('b-surf'),val:+v('b-val'),loyer:+v('b-loyer'),stat:v('b-stat'),dpe:v('b-dpe'),notes:v('b-notes'),contacts:collectPropertyContacts()};
-  const obj=isGFAContext()?{...base,commune:v('b-commune'),cadastre:v('b-cadastre'),nature:v('b-nature'),exploitant:v('b-exploitant'),typeBail:v('b-type-bail'),bailId:v('b-bail-id')}:base;
-  const ok = await saveWithFeedback(window.dbSet?.('biens',obj), e?(isGFAContext()?'Parcelle mise à jour ✓':'Bien mis à jour ✓'):(isGFAContext()?'Parcelle ajoutée ✓':'Bien ajouté ✓'));
-  if(ok) closeModal('m-bien');
+  const bienId=e?+id:Date.now();
+  try{
+    const contacts=await syncPropertyPartners(bienId,collectPropertyContacts());
+    const base={id:bienId,adr:v('b-adr'),type:v('b-type'),surf:+v('b-surf'),val:+v('b-val'),loyer:+v('b-loyer'),stat:v('b-stat'),dpe:v('b-dpe'),notes:v('b-notes'),contacts};
+    const obj=isGFAContext()?{...base,commune:v('b-commune'),cadastre:v('b-cadastre'),nature:v('b-nature'),exploitant:v('b-exploitant'),typeBail:v('b-type-bail'),bailId:v('b-bail-id')}:base;
+    const ok = await saveWithFeedback(window.dbSet?.('biens',obj), e?(isGFAContext()?'Parcelle mise à jour ✓':'Bien mis à jour ✓'):(isGFAContext()?'Parcelle ajoutée ✓':'Bien ajouté ✓'));
+    if(ok) closeModal('m-bien');
+  }catch(err){console.error('Erreur synchronisation partenaire',err);toast(formatFirebaseError(err));}
 }
 
 // ══ MODALS LOCATAIRES ══
@@ -4476,6 +4616,7 @@ window.SCIapp={
     renderHome(); renderStorageUsage();
     if(active==='mes-scis')renderMesSCIs();
     if(active==='biens')renderBiens();
+    else if(active==='partenaires')renderPartners();
     else if(active==='locataires')renderLoc();
     else if(active==='compta')renderCompta();
     else if(active==='comptable')renderComptable();
@@ -4676,7 +4817,7 @@ async function refreshAssocPartsOnStructureCards(scis){
   };
 
   window.exportApplicationJSON=function(){
-    const payload={exportedAt:new Date().toISOString(),structure:entityName(),data:{biens:safeRows(window.CACHE?.biens),locataires:safeRows(window.CACHE?.locataires),associes:safeRows(window.CACHE?.associes),operations:safeRows(window.CACHE?.ops),budgets:safeRows(window.CACHE?.budgets),documents:safeRows(window.CACHE?.docs).map(d=>({...d,dataUrl:undefined})),messages:safeRows(window.CACHE?.messages),decisions:safeRows(window.CACHE?.decisions),echeances:safeRows(window.CACHE?.echs),baux:safeRows(window.CACHE?.baux),settings:safeRows(window.CACHE?.settings)}};
+    const payload={exportedAt:new Date().toISOString(),structure:entityName(),data:{biens:safeRows(window.CACHE?.biens),partenaires:safeRows(window.CACHE?.contacts),locataires:safeRows(window.CACHE?.locataires),associes:safeRows(window.CACHE?.associes),operations:safeRows(window.CACHE?.ops),budgets:safeRows(window.CACHE?.budgets),documents:safeRows(window.CACHE?.docs).map(d=>({...d,dataUrl:undefined})),messages:safeRows(window.CACHE?.messages),decisions:safeRows(window.CACHE?.decisions),echeances:safeRows(window.CACHE?.echs),baux:safeRows(window.CACHE?.baux),settings:safeRows(window.CACHE?.settings)}};
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a');
     a.href=url; a.download='sci-family-export-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); toast('Sauvegarde JSON créée ✓');
   };
@@ -4685,7 +4826,7 @@ async function refreshAssocPartsOnStructureCards(scis){
     if(typeof XLSX==='undefined'){ toast('Librairie Excel non chargée'); return; }
     const wb=XLSX.utils.book_new();
     const sheets={
-      'Biens':safeRows(window.CACHE?.biens),'Locataires':safeRows(window.CACHE?.locataires),'Associes':safeRows(window.CACHE?.associes),'Operations':safeRows(window.CACHE?.ops),'Budget':safeRows(window.CACHE?.budgets),'Documents':safeRows(window.CACHE?.docs).map(d=>({id:d.id,nom:d.name,type:d.type,date:d.date,bien:d.bien,associe:d.associe,locataire:d.locataire,taille:d.size,stockage:d.storageMode,transmisComptable:d.sentAccountant?'oui':'non'})),'Messages':safeRows(window.CACHE?.messages),'Decisions':safeRows(window.CACHE?.decisions).map(d=>({id:d.id,titre:decTitle(d),type:d.type,statut:d.status,deadline:d.deadline,montant:d.montant,description:d.description,votes:safeRows(d.votes).length})),'Echeances_AG':safeRows(window.CACHE?.echs),'Baux_GFA':safeRows(window.CACHE?.baux)
+      'Biens':safeRows(window.CACHE?.biens),'Partenaires':safeRows(window.CACHE?.contacts),'Locataires':safeRows(window.CACHE?.locataires),'Associes':safeRows(window.CACHE?.associes),'Operations':safeRows(window.CACHE?.ops),'Budget':safeRows(window.CACHE?.budgets),'Documents':safeRows(window.CACHE?.docs).map(d=>({id:d.id,nom:d.name,type:d.type,date:d.date,bien:d.bien,associe:d.associe,locataire:d.locataire,taille:d.size,stockage:d.storageMode,transmisComptable:d.sentAccountant?'oui':'non'})),'Messages':safeRows(window.CACHE?.messages),'Decisions':safeRows(window.CACHE?.decisions).map(d=>({id:d.id,titre:decTitle(d),type:d.type,statut:d.status,deadline:d.deadline,montant:d.montant,description:d.description,votes:safeRows(d.votes).length})),'Echeances_AG':safeRows(window.CACHE?.echs),'Baux_GFA':safeRows(window.CACHE?.baux)
     };
     Object.entries(sheets).forEach(([name,rows])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{info:'Aucune donnée'}]),name.slice(0,31)));
     XLSX.writeFile(wb,'sci-family-export-complet-'+new Date().toISOString().slice(0,10)+'.xlsx'); toast('Export Excel complet créé ✓');
@@ -5044,6 +5185,7 @@ async function refreshAssocPartsOnStructureCards(scis){
       comptabilite: rows(cache.ops),
       budget: rows(cache.budgets),
       biens: rows(cache.biens),
+      partenaires: rows(cache.contacts),
       locataires: rows(cache.locataires),
       documents: rows(cache.docs).map(cloneWithoutHeavyFiles),
       associes: rows(cache.associes),

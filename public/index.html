@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20260618-startup-cache">
+<link rel="stylesheet" href="styles.css?v=20260621-partners-directory">
 <!-- ══ FIREBASE CDN — chargé en premier dans le head ══ -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -57,6 +57,7 @@
   <nav class="main-nav main-nav-general">
     <div class="nav-item nav-zone-pill"><button class="active" data-page="home" onclick="goPage(isGFAContext() ? 'gfa' : 'home')">Accueil</button></div>
     <div class="nav-item"><button data-page="biens" onclick="goPage('biens')">Biens</button></div>
+    <div class="nav-item"><button data-page="partenaires" onclick="goPage('partenaires')">Partenaires</button></div>
     <div class="nav-item" data-sci-only="locataires"><button data-page="locataires" data-sci-only="locataires" onclick="goPage('locataires')">Locataires</button></div>
     <div class="nav-item nav-zone-pill"><button data-page="compta" onclick="goPage('compta')">Comptabilité</button></div>
     <div class="nav-item"><button data-page="documents" onclick="goPage('documents')">Documents</button></div>
@@ -326,6 +327,31 @@
     <button class="btn write-only" onclick="openBienModal(null)">+ Ajouter</button>
   </div>
   <div class="cards" id="biens-list"></div>
+</div>
+
+<!-- ══ PARTENAIRES ══ -->
+<div id="page-partenaires" class="page">
+  <div class="back-btn" onclick="goPage('home')">Retour</div>
+  <div class="sec-hdr partners-page-head">
+    <div><h2>Partenaires</h2><p>Les professionnels qui accompagnent votre SCI.</p></div>
+    <button class="btn write-only" onclick="openPartnerModal(null)">+ Ajouter un partenaire</button>
+  </div>
+  <div class="partners-kpis">
+    <div><strong id="partners-count">0</strong><span>partenaires</span></div>
+    <div><strong id="partners-category-count">0</strong><span>catégories</span></div>
+    <div><strong id="partners-property-count">0</strong><span>biens couverts</span></div>
+  </div>
+  <div class="partners-toolbar">
+    <div class="partners-search"><span>⌕</span><input type="search" id="partners-search" placeholder="Rechercher un partenaire, une société, un rôle..." oninput="renderPartners()"></div>
+    <div id="partners-filters" class="partners-filters"></div>
+  </div>
+  <div class="partners-layout">
+    <div id="partners-grid" class="partners-grid"></div>
+    <aside class="partners-incomplete-panel">
+      <div class="partners-side-title"><span>⚠️</span><div><h3>Contacts à compléter</h3><p>Coordonnées ou rattachements manquants.</p></div></div>
+      <div id="partners-incomplete-list"></div>
+    </aside>
+  </div>
 </div>
 
 <div id="page-baux" class="page">
@@ -1330,7 +1356,32 @@
   </div>
 </div>
 
-<!-- Règles automatiques du journal -->
+<!-- Partenaire -->
+<div class="modal-overlay" id="m-partner">
+  <div class="modal partner-modal">
+    <h3 id="mpartner-t">🤝 Nouveau partenaire</h3>
+    <input type="hidden" id="partner-id">
+    <div class="frow">
+      <div class="fg"><label>Catégorie</label><select id="partner-type"><option>Banquier</option><option>Assureur</option><option>Notaire</option><option>Syndic</option><option>Agence immobilière</option><option>Comptable</option><option>Artisan / prestataire</option><option>Autre</option></select></div>
+      <div class="fg"><label>Institution / société</label><input type="text" id="partner-company" placeholder="Nom de l’organisme"></div>
+    </div>
+    <div class="fg"><label>Nom de l’interlocuteur</label><input type="text" id="partner-name" placeholder="Prénom et nom"></div>
+    <div class="fg"><label>Adresse</label><input type="text" id="partner-address" placeholder="Adresse complète"></div>
+    <div class="frow">
+      <div class="fg"><label>Téléphone</label><input type="tel" id="partner-phone" placeholder="01 23 45 67 89"></div>
+      <div class="fg"><label>Email</label><input type="email" id="partner-email" placeholder="contact@exemple.fr"></div>
+    </div>
+    <div class="fg"><label>Biens rattachés</label><div id="partner-properties" class="partner-property-choices"></div></div>
+    <div class="fg"><label>Notes</label><textarea id="partner-note" rows="3" placeholder="Rôle, horaires, références, personne à contacter..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-del" id="partner-del" style="display:none" onclick="confirmDeletePartner()">🗑 Supprimer</button>
+      <button class="btn-out" onclick="closeModal('m-partner')">Annuler</button>
+      <button class="btn" onclick="savePartner()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fiche du comptable -->
 <div class="modal-overlay" id="m-accountant">
   <div class="modal">
     <h3>👤 Fiche du comptable</h3>
@@ -1605,6 +1656,9 @@
     <button class="mnav-btn" id="mn-biens" onclick="goPage('biens')">
       <span class="mico">🏢</span>Biens immo
     </button>
+    <button class="mnav-btn" id="mn-partenaires" onclick="goPage('partenaires')">
+      <span class="mico">🤝</span>Partenaires
+    </button>
     <button class="mnav-btn" id="mn-compta" onclick="goPage('compta')">
       <span class="mico">📊</span>Comptabilité
     </button>
@@ -1621,7 +1675,7 @@
 </nav>
 
 <!-- Firebase SDK déplacé dans le <head> -->
-<script src="app.js?v=20260620-agenda-contacts-accountant"></script>
+<script src="app.js?v=20260621-partners-directory"></script>
 
 <!-- ══ APP — script classique, scope global ══ -->
 
