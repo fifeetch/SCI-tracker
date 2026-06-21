@@ -799,6 +799,12 @@ const $=id=>document.getElementById(id);
 const v=id=>$?($(id)?.value||''):'';
 const sv=(id,val)=>{const el=$(id);if(el)el.value=val;};
 const fmtDate=d=>{if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR');};
+function localISODate(date=new Date()){
+  const d=date instanceof Date?date:new Date(date);
+  if(isNaN(d)) return '';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function localISOMonth(date=new Date()){ return localISODate(date).slice(0,7); }
 function openModal(id){$(id).classList.add('open'); applyWriteAccessToModal(id);}
 function closeModal(id){$(id).classList.remove('open');}
 function toast(msg){const t=$('toast');if(!t)return;t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
@@ -1753,7 +1759,7 @@ function renderBiens(){
   const box=$('biens-list'); if(!box) return;
   if(isGFAContext()){
     box.innerHTML=list.length?list.map(b=>`
-    <div class="card" onclick="openBienModal(${b.id})">
+    <div class="card" onclick="openBienModal('${esc(String(b.id))}')">
       <div class="edit-hint">✏️ Cliquer pour modifier</div>
       <div class="card-hd"><div><div class="card-title">${esc(b.cadastre||b.adr||'Parcelle')}</div><div class="card-sub">${esc(b.commune||'Commune non renseignée')} · ${esc(b.nature||b.type||'Nature non renseignée')}</div></div><span class="tag tg">GFA</span></div>
       <div class="divider"></div>
@@ -1768,15 +1774,15 @@ function renderBiens(){
     return;
   }
   box.innerHTML=list.length?list.map(b=>`
-    <div class="card" onclick="openBienModal(${b.id})">
+    <div class="card" onclick="openBienModal('${esc(String(b.id))}')">
       <div class="edit-hint">✏️ Cliquer pour modifier</div>
-      <div class="card-hd"><div><div class="card-title">${b.adr}</div><div class="card-sub">${b.type} · ${b.surf} m²</div></div>
-      <span class="tag ${b.stat==='Loué'?'tg':b.stat==='Vacant'?'tr':'to'}">${b.stat}</span></div>
+      <div class="card-hd"><div><div class="card-title">${esc(b.adr||'Bien')}</div><div class="card-sub">${esc(b.type||'—')} · ${(+b.surf||0).toLocaleString('fr-FR')} m²</div></div>
+      <span class="tag ${b.stat==='Loué'?'tg':b.stat==='Vacant'?'tr':'to'}">${esc(b.stat||'—')}</span></div>
       <div class="divider"></div>
       <div class="info-row"><span>Valeur estimée</span><span>${(b.val||0).toLocaleString('fr-FR')} €</span></div>
       <div class="info-row"><span>Loyer mensuel</span><span>${(b.loyer||0).toLocaleString('fr-FR')} €</span></div>
-      <div class="info-row"><span>DPE</span><span class="tag tb">${b.dpe}</span></div>
-      ${b.notes?`<div class="info-row"><span>Notes</span><span style="color:var(--text2);font-size:12px">${b.notes}</span></div>`:''}
+      <div class="info-row"><span>DPE</span><span class="tag tb">${esc(b.dpe||'—')}</span></div>
+      ${b.notes?`<div class="info-row"><span>Notes</span><span style="color:var(--text2);font-size:12px">${esc(b.notes)}</span></div>`:''}
       <div class="divider"></div>
       <div style="font-size:12px;color:var(--text2)">Rendement brut</div>
       <div class="progress"><div class="progress-bar" style="width:${b.val?Math.min((b.loyer*12/b.val*100)*2,100).toFixed(0):0}%"></div></div>
@@ -1900,21 +1906,21 @@ function confirmDeletePartner(){
 function renderLoc(){
   const list=window.CACHE?.locataires||[];
   $('loc-list').innerHTML=list.length?list.map(l=>`
-    <div class="card" onclick="openLocataireModal(${l.id})">
+    <div class="card" onclick="openLocataireModal('${esc(String(l.id))}')">
       <div class="edit-hint">✏️ Cliquer pour modifier</div>
-      <div class="card-hd"><div><div class="card-title">${l.prenom} ${l.nom}</div><div class="card-sub">${l.bien||'—'}</div></div>
+      <div class="card-hd"><div><div class="card-title">${esc([l.prenom,l.nom].filter(Boolean).join(' ')||'Locataire')}</div><div class="card-sub">${esc(l.bien||'—')}</div></div>
       <span class="tag tg">Actif</span></div>
       <div class="divider"></div>
       <div class="info-row"><span>Loyer + charges</span><span>${l.loyer} + ${l.charges} €</span></div>
       <div class="info-row"><span>Bail</span><span>${fmtDate(l.entree)} → ${fmtDate(l.fin)}</span></div>
       <div class="info-row"><span>Dépôt</span><span>${l.depot} €</span></div>
-      <div class="info-row"><span>IBAN</span><span style="font-size:11px;font-family:monospace">${l.iban||'—'}</span></div>
-      ${l.note?`<div class="note-box">📝 ${l.note}</div>`:''}
+      <div class="info-row"><span>IBAN</span><span style="font-size:11px;font-family:monospace">${esc(l.iban||'—')}</span></div>
+      ${l.note?`<div class="note-box">📝 ${esc(l.note)}</div>`:''}
       <div class="divider"></div>
       <div class="card-acts" onclick="event.stopPropagation()">
-        <a href="tel:${l.tel}" class="act-call">📞 Appeler</a>
-        <a href="mailto:${l.email}" class="act-mail">✉️ Email</a>
-        <button class="act-edit write-only" onclick="genQuittanceFromLoc(${l.id})">🧾 Quittance</button>
+        <a href="tel:${esc(l.tel||'')}" class="act-call">📞 Appeler</a>
+        <a href="mailto:${esc(l.email||'')}" class="act-mail">✉️ Email</a>
+        <button class="act-edit write-only" onclick="genQuittanceFromLoc('${esc(String(l.id))}')">🧾 Quittance</button>
       </div>
     </div>`).join(''):'<p style="color:var(--text2);padding:20px">Aucun locataire.</p>';
 }
@@ -2158,7 +2164,7 @@ async function importOpsCSV(event){
       let mt = recette ? recette : (charge ? -Math.abs(charge) : numFR(r['montant signe']||r.montant));
       const type=(r.type||'').toLowerCase().includes('charge') || mt<0 ? 'charge' : 'recette';
       if(type==='charge') mt=-Math.abs(mt); else mt=Math.abs(mt);
-      const obj=applyAccountingRulesToOp({id:Date.now()+count,date:r.date||new Date().toISOString().split('T')[0],lib:r.libelle||r['libellé']||'',bien:r.bien||'',cat:r.categorie||r['catégorie']||'Autre',type,payment:r.paiement||'',status:r.statut||'paye',docId:r['id justificatif']||'',mt});
+      const obj=applyAccountingRulesToOp({id:Date.now()+count,date:r.date||localISODate(),lib:r.libelle||r['libellé']||'',bien:r.bien||'',cat:r.categorie||r['catégorie']||'Autre',type,payment:r.paiement||'',status:r.statut||'paye',docId:r['id justificatif']||'',mt});
       await window.dbSet?.('ops',obj);
       count++;
     }
@@ -2871,7 +2877,7 @@ function existingBankKeys(){
   return set;
 }
 function parseBankDate(value, fallbackYear){
-  if(value instanceof Date && !isNaN(value)) return value.toISOString().split('T')[0];
+  if(value instanceof Date && !isNaN(value)) return localISODate(value);
   if(typeof value==='number' && window.XLSX){
     try{ const d=XLSX.SSF.parse_date_code(value); if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`; }catch(e){}
   }
@@ -2882,7 +2888,7 @@ function parseBankDate(value, fallbackYear){
   if(m){ let y=+m[3]; if(y<100) y+=2000; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
   m=s.match(/^(\d{1,2})[\/\.-](\d{1,2})$/);
   if(m){ const y=fallbackYear||new Date().getFullYear(); return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
-  const d=new Date(s); if(!isNaN(d)) return d.toISOString().split('T')[0];
+  const d=new Date(s); if(!isNaN(d)) return localISODate(d);
   return '';
 }
 function readArrayBufferFile(file){ return new Promise((res,rej)=>{const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error); r.readAsArrayBuffer(file);}); }
@@ -2967,7 +2973,7 @@ async function importCreditAgricoleFile(event){
 function openBankBalanceModal(){
   if(!canWrite()){ denyWrite(); return; }
   const ref=bankBalanceRef();
-  sv('bank-balance-date', ref?.date || new Date().toISOString().split('T')[0]);
+  sv('bank-balance-date', ref?.date || localISODate());
   sv('bank-balance-amount', ref?.balance ?? '');
   sv('bank-balance-label-input', ref?.label || 'Compte courant Crédit Agricole');
   openModal('m-bank-balance');
@@ -3346,7 +3352,7 @@ async function handleFileUpload(e){
     // Firestore limite chaque document à ~1 Mo. On découpe donc le fichier en petits morceaux.
     const chunkSize=450000;
     const totalChunks=Math.ceil(dataUrl.length/chunkSize);
-    const meta={id,name:file.name,type,date:new Date().toISOString().split('T')[0],icon,mime:file.type||'',size:file.size,storageMode:'firestoreChunks',chunkCount:totalChunks,bien:'',associe:'',locataire:''};
+    const meta={id,name:file.name,type,date:localISODate(),icon,mime:file.type||'',size:file.size,storageMode:'firestoreChunks',chunkCount:totalChunks,bien:'',associe:'',locataire:''};
     await window.dbSet?.('docs',meta);
     const ref=colRef('docs').doc(String(id)).collection('chunks');
     let batch=db.batch(), count=0;
@@ -3501,8 +3507,8 @@ async function saveBien(){
 function openLocataireModal(id){
   const biens=window.CACHE?.biens||[];
   const sel=$('l-bien-sel');
-  if(sel)sel.innerHTML='<option value="">— Sélectionner —</option>'+biens.map(b=>`<option value="${b.adr}">${b.adr}</option>`).join('');
-  const e=id!=null,l=e?(window.CACHE?.locataires||[]).find(x=>x.id===id):null;
+  if(sel)sel.innerHTML='<option value="">— Sélectionner —</option>'+biens.map(b=>`<option value="${esc(b.adr||'')}">${esc(b.adr||'Bien')}</option>`).join('');
+  const e=id!=null,l=e?(window.CACHE?.locataires||[]).find(x=>String(x.id)===String(id)):null;
   $('mloc-t').innerHTML=e?'🧑 Modifier &nbsp;<span class="mbadge">Édition</span>':'🧑 Nouveau locataire';
   $('l-del').style.display=e?'block':'none';
   if(e&&l){sv('l-id',l.id);sv('l-prenom',l.prenom);sv('l-nom',l.nom);sv('l-tel',l.tel);sv('l-email',l.email);if(sel)sel.value=l.bien||'';sv('l-loyer',l.loyer);sv('l-charges',l.charges);sv('l-entree',l.entree);sv('l-fin',l.fin);sv('l-iban',l.iban||'');sv('l-depot',l.depot||'');sv('l-note',l.note||'');}
@@ -3546,7 +3552,7 @@ function openOpModal(id){
   $('op-del').style.display=e?'block':'none';
   fillOpDocsSelect(op?.docId||'');
   if(e&&op){sv('op-id',op.id);sv('op-date',op.date);sv('op-type',op.type);sv('op-lib',op.lib);sv('op-mt',Math.abs(op.mt));sv('op-cat',op.cat);sv('op-pay',op.payment||'Virement');sv('op-status',op.status||'paye');sv('op-doc',op.docId||'');if(sel)sel.value=op.bien||'';}
-  else{sv('op-id','');sv('op-date',new Date().toISOString().split('T')[0]);sv('op-lib','');sv('op-mt','');sv('op-type','recette');sv('op-cat',isGFAContext()?'Fermage':'Loyer');sv('op-pay','Virement');sv('op-status','paye');sv('op-doc','');if(sel)sel.value='';}
+  else{sv('op-id','');sv('op-date',localISODate());sv('op-lib','');sv('op-mt','');sv('op-type','recette');sv('op-cat',isGFAContext()?'Fermage':'Loyer');sv('op-pay','Virement');sv('op-status','paye');sv('op-doc','');if(sel)sel.value='';}
   openModal('m-op');
 }
 async function saveOp(){
@@ -3620,7 +3626,8 @@ function confirmDel(type,directId){
       if(ok) closeModal('m-op');
     }
     else if(type==='doc' || type==='doc-direct'){
-      try{ await deleteDocChunks(id); }catch(e){ console.warn('Chunks document non supprimés ou absents', e); }
+      try{ await deleteDocChunks(id); }
+      catch(e){ toast('Suppression interrompue : les fragments du document n’ont pas tous été supprimés. Réessaie.'); return; }
       const ok=await deleteWithFeedback('docs',id,'Document supprimé ✓');
       if(ok) closeModal('m-doc');
     }
@@ -3685,13 +3692,13 @@ function genQuittanceFromLoc(locId){
 }
 
 function euro(n){ return (+n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'; }
-function isoToday(){ return new Date().toISOString().slice(0,10); }
-function currentMonthValue(){ return new Date().toISOString().slice(0,7); }
+function isoToday(){ return localISODate(); }
+function currentMonthValue(){ return localISOMonth(); }
 function monthBounds(monthValue){
   const raw=monthValue || currentMonthValue();
   const [y,m]=raw.split('-').map(Number);
-  const start=new Date(y,m-1,1), end=new Date(y,m,0);
-  return {start:start.toISOString().slice(0,10), end:end.toISOString().slice(0,10)};
+  const lastDay=new Date(y,m,0).getDate();
+  return {start:`${y}-${String(m).padStart(2,'0')}-01`, end:`${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`};
 }
 function formatLongDate(iso){
   if(!iso) return '—';
@@ -3840,13 +3847,15 @@ async function deleteDocChunks(id){
   try{
     const snap=await colRef('docs').doc(String(id)).collection('chunks').get();
     if(snap.empty) return;
-    let batch=db.batch(), count=0;
-    snap.docs.forEach(doc=>{
-      batch.delete(doc.ref); count++;
-      if(count>=400){ batch.commit(); batch=db.batch(); count=0; }
-    });
-    if(count>0) await batch.commit();
-  }catch(err){ console.warn('Chunks document non supprimés',err); }
+    for(let i=0;i<snap.docs.length;i+=400){
+      const batch=db.batch();
+      snap.docs.slice(i,i+400).forEach(doc=>batch.delete(doc.ref));
+      await batch.commit();
+    }
+  }catch(err){
+    console.warn('Chunks document non supprimés',err);
+    throw err;
+  }
 }
 function dataUrlToBlob(dataUrl){
   const parts=String(dataUrl||'').split(',');
@@ -4160,7 +4169,7 @@ function openDecisionModal(id){
     const ed=document.getElementById('dec-email-reminder-delay'); if(ed) ed.value=String(n.reminderDelayDays||2);
   }
   else{
-    sv('dec-id','');sv('dec-title','');sv('dec-type','travaux');sv('dec-montant','');if(sel)sel.value='';const dd=new Date();dd.setDate(dd.getDate()+14);sv('dec-deadline',dd.toISOString().split('T')[0]);sv('dec-description','');
+    sv('dec-id','');sv('dec-title','');sv('dec-type','travaux');sv('dec-montant','');if(sel)sel.value='';const dd=new Date();dd.setDate(dd.getDate()+14);sv('dec-deadline',localISODate(dd));sv('dec-description','');
     const en=document.getElementById('dec-email-enabled'); if(en) en.checked=false;
     const eg=document.getElementById('dec-email-gerants'); if(eg) eg.checked=true;
     const ea=document.getElementById('dec-email-associes'); if(ea) ea.checked=true;
@@ -4327,7 +4336,7 @@ function renderCalendar(){
   for(let d=1;d<=dim;d++){
     const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const de=echs.filter(e=>e.date===ds),it=new Date(calYear,calMonth,d).getTime()===today.getTime();
-    let dots=de.slice(0,2).map(e=>`<span class="cal-dot ${echUrgency(e)}" onclick="event.stopPropagation();openEchModal(${e.id})">${ECH_ICONS[e.type]||'📌'} ${e.titre}</span>`).join('');
+    let dots=de.slice(0,2).map(e=>`<span class="cal-dot ${echUrgency(e)}" onclick="event.stopPropagation();openEchModal('${esc(String(e.id))}')">${ECH_ICONS[e.type]||'📌'} ${esc(e.titre||'Événement')}</span>`).join('');
     if(de.length>2)dots+=`<span style="font-size:10px;color:var(--text3)">+${de.length-2}</span>`;
     h+=`<div class="cal-day${it?' today':''}"><div class="day-num">${d}</div>${dots}</div>`;
   }
@@ -4357,15 +4366,15 @@ function echItemHtml(e){
   const u=echUrgency(e),dl=echDaysLabel(e);
   const timing=[e.heure||'', e.duree?e.duree+' min':''].filter(Boolean).join(' · ');
   const sub=[timing,e.bien,e.loc,e.mt?e.mt.toLocaleString('fr-FR')+' €':''].filter(Boolean).join(' · ');
-  return `<div class="ech-item${e.done?' done-item':''}" onclick="openEchModal(${e.id})">
+  return `<div class="ech-item${e.done?' done-item':''}" onclick="openEchModal('${esc(String(e.id))}')">
     <div class="ech-icon">${ECH_ICONS[e.type]||'📌'}</div>
-    <div class="ech-body"><div class="ech-title">${e.titre}</div><div class="ech-sub">${ECH_LABELS[e.type]||'Autre'}${e.recurrence==='yearly'?' · 🔁 Tous les ans':''}${sub?' · '+sub:''}</div>${e.notes?`<div class="ech-sub" style="font-style:italic">${e.notes}</div>`:''}</div>
+    <div class="ech-body"><div class="ech-title">${esc(e.titre||'Événement')}</div><div class="ech-sub">${esc(ECH_LABELS[e.type]||'Autre')}${e.recurrence==='yearly'?' · 🔁 Tous les ans':''}${sub?' · '+esc(sub):''}</div>${e.notes?`<div class="ech-sub" style="font-style:italic">${esc(e.notes)}</div>`:''}</div>
     <div class="ech-right"><span class="ech-dlbl ${u}">${fmtDate(e.date)}</span><span class="days-badge ${u}">${dl}</span>
-    <button class="done-toggle write-only" onclick="event.stopPropagation();toggleEchDone(${e.id})">${e.done?'↩ Rouvrir':'✓ Traiter'}</button></div>
+    <button class="done-toggle write-only" onclick="event.stopPropagation();toggleEchDone('${esc(String(e.id))}')">${e.done?'↩ Rouvrir':'✓ Traiter'}</button></div>
   </div>`;
 }
 async function toggleEchDone(id){
-  const e=(window.CACHE?.echs||[]).find(x=>x.id===id);if(!e)return;
+  const e=(window.CACHE?.echs||[]).find(x=>String(x.id)===String(id));if(!e)return;
   if(e.recurrence==='yearly'&&!e.done){
     const next=nextYearDate(e.date);
     await saveWithFeedback(window.dbSet?.('echs',{...e,date:next,done:false,lastCompletedDate:e.date}),`Traitée · prochaine échéance le ${fmtDate(next)} ✓`);
@@ -4397,7 +4406,7 @@ function openEchModal(id){
   $('ech-del').style.display=e?'block':'none';
   renderInviteLists(ec?.guests?.map(g=>g.email)||[]);
   if(e&&ec){sv('ech-id',ec.id);sv('ech-titre',ec.titre);sv('ech-date',ec.date);sv('ech-type',ec.type);sv('ech-heure',ec.heure||'');sv('ech-duree',ec.duree||'');sv('ech-lieu',ec.lieu||'');sv('ech-recurrence',ec.recurrence||'none');if(sb)sb.value=ec.bien||'';if(sl)sl.value=ec.loc||'';sv('ech-mt',ec.mt||'');sv('ech-notes',ec.notes||'');const ed=$('ech-done');if(ed)ed.checked=!!ec.done;}
-  else{sv('ech-id','');sv('ech-titre','');sv('ech-mt','');sv('ech-notes','');sv('ech-type','bail');sv('ech-heure','');sv('ech-duree','60');sv('ech-lieu','');sv('ech-recurrence','none');if(sb)sb.value='';if(sl)sl.value='';const ed=$('ech-done');if(ed)ed.checked=false;const dd=new Date();dd.setDate(dd.getDate()+30);sv('ech-date',dd.toISOString().split('T')[0]);}
+  else{sv('ech-id','');sv('ech-titre','');sv('ech-mt','');sv('ech-notes','');sv('ech-type','bail');sv('ech-heure','');sv('ech-duree','60');sv('ech-lieu','');sv('ech-recurrence','none');if(sb)sb.value='';if(sl)sl.value='';const ed=$('ech-done');if(ed)ed.checked=false;const dd=new Date();dd.setDate(dd.getDate()+30);sv('ech-date',localISODate(dd));}
   toggleReunionFields();
   openModal('m-ech');
 }
@@ -4777,7 +4786,7 @@ async function refreshAssocPartsOnStructureCards(scis){
     const ag=id!=null ? agRows().find(x=>String(x.id)===String(id)) : null;
     if($('mag-t')) $('mag-t').innerHTML=ag?'🏛️ Modifier l’AG &nbsp;<span class="mbadge">Vie de la SCI</span>':'🏛️ Nouvelle assemblée générale';
     if($('ag-del')) $('ag-del').style.display=ag?'block':'none';
-    sv('ag-id', ag?.id || ''); sv('ag-title', ag?.titre || ag?.title || ''); sv('ag-date', ag?.date || new Date().toISOString().slice(0,10)); sv('ag-time', ag?.heure || '18:00'); sv('ag-place', ag?.lieu || ag?.place || ''); sv('ag-president', ag?.president || ''); sv('ag-secretary', ag?.secretary || ''); sv('ag-convocation-date', ag?.convocationDate || ''); sv('ag-kind', ag?.kind || 'AGO'); sv('ag-agenda', ag?.agenda || ''); sv('ag-status', ag?.status || 'planned'); sv('ag-notes', ag?.notes || ''); sv('ag-conclusion', ag?.conclusion || '');
+    sv('ag-id', ag?.id || ''); sv('ag-title', ag?.titre || ag?.title || ''); sv('ag-date', ag?.date || localISODate()); sv('ag-time', ag?.heure || '18:00'); sv('ag-place', ag?.lieu || ag?.place || ''); sv('ag-president', ag?.president || ''); sv('ag-secretary', ag?.secretary || ''); sv('ag-convocation-date', ag?.convocationDate || ''); sv('ag-kind', ag?.kind || 'AGO'); sv('ag-agenda', ag?.agenda || ''); sv('ag-status', ag?.status || 'planned'); sv('ag-notes', ag?.notes || ''); sv('ag-conclusion', ag?.conclusion || '');
     fillAgLists(ag);
     openModal('m-ag');
   };
@@ -4819,7 +4828,7 @@ async function refreshAssocPartsOnStructureCards(scis){
   window.exportApplicationJSON=function(){
     const payload={exportedAt:new Date().toISOString(),structure:entityName(),data:{biens:safeRows(window.CACHE?.biens),partenaires:safeRows(allPartners()),locataires:safeRows(window.CACHE?.locataires),associes:safeRows(window.CACHE?.associes),operations:safeRows(window.CACHE?.ops),budgets:safeRows(window.CACHE?.budgets),documents:safeRows(window.CACHE?.docs).map(d=>({...d,dataUrl:undefined})),messages:safeRows(window.CACHE?.messages),decisions:safeRows(window.CACHE?.decisions),echeances:safeRows(window.CACHE?.echs),baux:safeRows(window.CACHE?.baux),settings:safeRows(window.CACHE?.settings)}};
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a');
-    a.href=url; a.download='sci-family-export-'+new Date().toISOString().slice(0,10)+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); toast('Sauvegarde JSON créée ✓');
+    a.href=url; a.download='sci-family-export-'+localISODate()+'.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); toast('Sauvegarde JSON créée ✓');
   };
 
   window.exportApplicationXLSX=function(){
@@ -4829,7 +4838,7 @@ async function refreshAssocPartsOnStructureCards(scis){
       'Biens':safeRows(window.CACHE?.biens),'Partenaires':safeRows(allPartners()),'Locataires':safeRows(window.CACHE?.locataires),'Associes':safeRows(window.CACHE?.associes),'Operations':safeRows(window.CACHE?.ops),'Budget':safeRows(window.CACHE?.budgets),'Documents':safeRows(window.CACHE?.docs).map(d=>({id:d.id,nom:d.name,type:d.type,date:d.date,bien:d.bien,associe:d.associe,locataire:d.locataire,taille:d.size,stockage:d.storageMode,transmisComptable:d.sentAccountant?'oui':'non'})),'Messages':safeRows(window.CACHE?.messages),'Decisions':safeRows(window.CACHE?.decisions).map(d=>({id:d.id,titre:decTitle(d),type:d.type,statut:d.status,deadline:d.deadline,montant:d.montant,description:d.description,votes:safeRows(d.votes).length})),'Echeances_AG':safeRows(window.CACHE?.echs),'Baux_GFA':safeRows(window.CACHE?.baux)
     };
     Object.entries(sheets).forEach(([name,rows])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{info:'Aucune donnée'}]),name.slice(0,31)));
-    XLSX.writeFile(wb,'sci-family-export-complet-'+new Date().toISOString().slice(0,10)+'.xlsx'); toast('Export Excel complet créé ✓');
+    XLSX.writeFile(wb,'sci-family-export-complet-'+localISODate()+'.xlsx'); toast('Export Excel complet créé ✓');
   };
 
   const oldRenderAssoc=window.renderAssoc;
@@ -4848,7 +4857,7 @@ async function refreshAssocPartsOnStructureCards(scis){
   }
   function val(id){ var el=document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
   function setVal(id,value){ var el=document.getElementById(id); if(el) el.value = value || ''; }
-  function today(){ return new Date().toISOString().slice(0,10); }
+  function today(){ return localISODate(); }
   function fmtLocalDate(date){
     if(!date) return '—';
     if(typeof window.fmtDate === 'function') return window.fmtDate(date);
@@ -5063,7 +5072,7 @@ async function refreshAssocPartsOnStructureCards(scis){
   function setVal(id,v){ var el=$(id); if(el) el.value = v || ''; }
   function esc(s){ return String(s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function notify(msg){ if(typeof window.toast==='function') window.toast(msg); else alert(msg); }
-  function today(){ return new Date().toISOString().slice(0,10); }
+  function today(){ return localISODate(); }
   function storageKey(){
     var sci = (window.currentSciId || window.ACTIVE_SCI_ID || (window.CURRENT_SCI && window.CURRENT_SCI.id) || 'default');
     return 'sci_family_pouvoirs_' + sci;
@@ -5237,7 +5246,7 @@ async function refreshAssocPartsOnStructureCards(scis){
   }
   window.exportSCIDataJSON = function(){
     try{
-      var date = new Date().toISOString().slice(0,10);
+      var date = localISODate();
       downloadJSON('sci-family-export-donnees-' + slug(safeEntityName()) + '-' + date + '.json', exportPayload());
       if(typeof window.toast === 'function') window.toast('Export JSON créé ✓');
     }catch(err){
@@ -5252,7 +5261,7 @@ async function refreshAssocPartsOnStructureCards(scis){
       var key = moduleName || (sel ? sel.value : 'comptabilite');
       var sets = dataSets();
       var list = rows(sets[key]);
-      var date = new Date().toISOString().slice(0,10);
+      var date = localISODate();
       downloadBlob('sci-family-' + key + '-' + slug(safeEntityName()) + '-' + date + '.csv', toCSV(list), 'text/csv;charset=utf-8');
       if(typeof window.toast === 'function') window.toast('Export CSV ' + key + ' créé ✓');
     }catch(err){
@@ -5345,7 +5354,7 @@ async function refreshAssocPartsOnStructureCards(scis){
       }
       zip.file('MANIFESTE-DOCUMENTS.json', JSON.stringify({application:'SCI Family', structure:safeEntityName(), exportedAt:new Date().toISOString(), totalDocuments:docs.length, fichiersInclus:added, documents:manifest}, null, 2));
       var blob = await zip.generateAsync({type:'blob'});
-      var date = new Date().toISOString().slice(0,10);
+      var date = localISODate();
       var url = URL.createObjectURL(blob);
       var a = document.createElement('a');
       a.href = url;
@@ -5381,7 +5390,7 @@ async function refreshAssocPartsOnStructureCards(scis){
         if(!list.length) list = [{aucune_donnee:''}];
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(list), sheetName(key));
       });
-      var date = new Date().toISOString().slice(0,10);
+      var date = localISODate();
       XLSX.writeFile(wb, 'sci-family-export-global-' + slug(safeEntityName()) + '-' + date + '.xlsx');
       if(typeof window.toast === 'function') window.toast('Export Excel créé ✓');
     }catch(err){
